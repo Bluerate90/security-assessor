@@ -1,0 +1,2958 @@
+under security_assessor/configuration rolder
+as security_assessor/configuration/.env
+.env file
+
+
+security_assessor/configuration/.env
+
+# Google Gemini API Configuration
+GEMINI_API_KEY=AIzaSyA0MtqSKF0RPeLCfIPVlzBqJEeahsZjn6k
+
+# Flask Configuration
+FLASK_ENV=development
+DEBUG=true
+PORT=5000
+
+# Cache Configuration
+CACHE_DIR=./Runtime/assessor_cache
+CACHE_TTL_DAYS=7
+
+# Logging Configuration
+LOG_LEVEL=INFO
+LOG_FILE=./logs/assessor.log
+
+
+
+
+security_assessor/configuration/config.py
+
+"""
+Configuration Management for Security Assessor
+Loads environment variables from .env file
+"""
+
+import os
+import sys
+from pathlib import Path
+
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    print("❌ python-dotenv not installed. Run: pip install python-dotenv")
+    sys.exit(1)
+
+# Load .env file from Configuration directory
+ENV_FILE = Path(__file__).parent / '.env'
+if ENV_FILE.exists():
+    load_dotenv(ENV_FILE)
+    print(f"✓ Loaded environment from {ENV_FILE}")
+else:
+    print(f"⚠ .env file not found at {ENV_FILE}")
+    print(f"  Create it by copying Configuration/.env.example")
+
+
+class Config:
+    """Configuration - reads from .env via dotenv"""
+    
+    # API Configuration
+    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+    GEMINI_MODEL = 'gemini-2.0-flash-exp'
+    
+    # Flask Configuration
+    FLASK_ENV = os.getenv('FLASK_ENV', 'development')
+    DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
+    PORT = int(os.getenv('PORT', 5000))
+    SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
+    
+    # Cache Configuration
+    CACHE_DIR = Path(os.getenv('CACHE_DIR', './Runtime/assessor_cache'))
+    CACHE_TTL_DAYS = int(os.getenv('CACHE_TTL_DAYS', 7))
+    
+    # Logging Configuration
+    LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+    LOG_FILE = os.getenv('LOG_FILE', './logs/assessor.log')
+    
+    # Timeout Configuration
+    REQUEST_TIMEOUT = 30
+    CISA_KEV_TIMEOUT = 15
+    
+    # Request Configuration
+    USER_AGENT = 'SecurityAssessor/1.0 (Research Tool)'
+    
+    @classmethod
+    def validate(cls):
+        """Validate critical configuration"""
+        errors = []
+        
+        if not cls.GEMINI_API_KEY:
+            errors.append("GEMINI_API_KEY is required. Set it in Configuration/.env file")
+        
+        if not cls.CACHE_DIR:
+            errors.append("CACHE_DIR is required")
+        
+        return errors
+    
+    @classmethod
+    def display(cls):
+        """Display configuration (without sensitive data)"""
+        print("\n" + "="*70)
+        print("⚙️  CONFIGURATION")
+        print("="*70)
+        print(f"Environment:       {cls.FLASK_ENV}")
+        print(f"Debug Mode:        {cls.DEBUG}")
+        print(f"Port:              {cls.PORT}")
+        print(f"Cache Directory:   {cls.CACHE_DIR}")
+        print(f"Cache TTL:         {cls.CACHE_TTL_DAYS} days")
+        print(f"Log Level:         {cls.LOG_LEVEL}")
+        print(f"Gemini Model:      {cls.GEMINI_MODEL}")
+        print(f"API Key Status:    {'✓ Configured' if cls.GEMINI_API_KEY else '✗ Missing'}")
+        print("="*70 + "\n")
+
+
+# Select configuration
+config = Config()
+
+# Validate on import
+errors = config.validate()
+if errors:
+    print("\n❌ Configuration Errors:")
+    for error in errors:
+        print(f"  • {error}")
+    print("\nPlease fix these issues before running the application.\n")
+    sys.exit(1)
+
+
+
+
+
+
+
+
+security_assessor/configuration/requirements.txt
+
+# Core Web Framework
+Flask==3.0.0
+Flask-CORS==4.0.0
+
+# AI and Generative APIs
+google-generativeai==0.3.0
+
+# HTTP and Web Utilities
+requests==2.31.0
+beautifulsoup4==4.12.2
+
+# Environment Configuration
+python-dotenv==1.0.0
+
+# Web Server
+Werkzeug==3.0.0
+
+# Optional: Production Server
+gunicorn==21.2.0
+
+
+
+
+
+
+
+
+
+
+security_assessor/logs
+
+
+
+
+
+security_assessor/Python-Modules-Backend/alternative_suggester.py
+
+"""
+Safer Alternatives Suggester
+Uses configuration from config.py which loads .env file
+"""
+
+import json
+from datetime import datetime
+from typing import Dict, List, Optional
+import google.generativeai as genai
+
+# Add Configuration to path and import config
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent / 'Configuration'))
+from config import config
+
+
+class AlternativesSuggester:
+    """Suggests safer alternatives based on category and security posture"""
+    
+    def __init__(self, gemini_model=None):
+        """
+        Initialize suggester
+        
+        Args:
+            gemini_model: Existing Gemini model instance (or creates new one with config)
+        """
+        if gemini_model:
+            self.model = gemini_model
+        else:
+            genai.configure(api_key=config.GEMINI_API_KEY)
+            self.model = genai.GenerativeModel(config.GEMINI_MODEL)
+        
+        print("✓ Alternatives Suggester initialized")
+    
+    def _build_alternatives_prompt(self, 
+                                   product_name: str,
+                                   vendor_name: str,
+                                   classification: Dict,
+                                   sources: Dict,
+                                   current_risk_level: str = "unknown") -> str:
+        """Build prompt for finding safer alternatives"""
+        
+        category = classification.get('primary_subcategory', 'Unknown')
+        key_functions = classification.get('key_functions', [])
+        deployment = classification.get('deployment_model', 'Unknown')
+        
+        risk_signals = []
+        if sources.get('cisa_kev', {}).get('found'):
+            kev_count = sources['cisa_kev'].get('total_matches', 0)
+            risk_signals.append(f"Found in CISA KEV with {kev_count} exploited vulnerabilities")
+        
+        risk_text = "\n".join(risk_signals) if risk_signals else "No critical risk signals detected"
+        
+        functions_text = ", ".join(key_functions) if key_functions else "general software functionality"
+        
+        prompt = f"""You are a cybersecurity advisor recommending safer alternatives for enterprise software.
+
+CURRENT PRODUCT: {product_name} by {vendor_name}
+CATEGORY: {category}
+KEY FUNCTIONS: {functions_text}
+DEPLOYMENT: {deployment}
+RISK SIGNALS: {risk_text}
+
+Your task: Recommend 1-2 SAFER alternatives in the same category that:
+- Provide similar functionality
+- Have better security posture (based on public evidence)
+- Are enterprise-ready and reputable
+- Have good compliance/certification track record
+
+For each alternative, provide:
+1. Product name and vendor
+2. Why it's safer (specific security advantages with evidence)
+3. Key differences from current product
+4. Any trade-offs (cost, features, complexity)
+
+IMPORTANT RULES:
+- Only recommend if you have HIGH confidence based on public security reputation
+- Prefer alternatives with: SOC 2, ISO 27001, transparent security practices, good vulnerability disclosure
+- Do NOT recommend if insufficient evidence exists
+- Be honest about confidence level
+- Cite specific security advantages (e.g., "Has SOC 2 Type II", "Zero CISA KEV entries", "Open source with security audits")
+
+Respond ONLY with valid JSON (no markdown):
+{{
+  "alternatives": [
+    {{
+      "product_name": "Alternative Product",
+      "vendor_name": "Vendor Name",
+      "vendor_website": "https://example.com",
+      "why_safer": "Specific security advantages with evidence",
+      "security_highlights": ["advantage1", "advantage2", "advantage3"],
+      "key_differences": ["difference1", "difference2"],
+      "trade_offs": ["tradeoff1", "tradeoff2"],
+      "confidence": 0.0-1.0,
+      "evidence_basis": "Has SOC 2, ISO 27001, etc."
+    }}
+  ],
+  "recommendation_confidence": 0.0-1.0,
+  "rationale": "Overall reasoning for recommendations",
+  "note": "Any important caveats or disclaimers"
+}}
+
+If you cannot confidently recommend safer alternatives, return:
+{{
+  "alternatives": [],
+  "recommendation_confidence": 0.0,
+  "rationale": "Insufficient public evidence to recommend alternatives",
+  "note": "More research needed or current product may be appropriate choice"
+}}
+"""
+        return prompt
+    
+    def suggest_alternatives(self,
+                           product_name: str,
+                           vendor_name: str, 
+                           classification: Dict,
+                           sources: Dict,
+                           current_risk_level: str = "unknown") -> Dict:
+        """
+        Suggest safer alternatives with evidence-based rationale
+        
+        Args:
+            product_name: Current product name
+            vendor_name: Current vendor name
+            classification: Taxonomy classification data
+            sources: High-signal sources from entity resolution
+            current_risk_level: Optional risk assessment of current product
+            
+        Returns:
+            Alternatives with rationale and comparison data
+        """
+        print(f"\n{'='*60}")
+        print(f"🔄 Finding Safer Alternatives")
+        print(f"{'='*60}")
+        
+        prompt = self._build_alternatives_prompt(
+            product_name, vendor_name, classification, sources, current_risk_level
+        )
+        
+        try:
+            print(f"  🤖 Searching for alternatives with better security posture...")
+            response = self.model.generate_content(prompt)
+            text = response.text.strip()
+            
+            if text.startswith('```'):
+                text = text.split('```')[1]
+                if text.startswith('json'):
+                    text = text[4:]
+                text = text.strip()
+            
+            alternatives_data = json.loads(text)
+            alternatives_data['suggested_at'] = datetime.now().isoformat()
+            alternatives_data['for_product'] = product_name
+            
+            self._validate_alternatives(alternatives_data)
+            
+            alt_count = len(alternatives_data.get('alternatives', []))
+            confidence = alternatives_data.get('recommendation_confidence', 0)
+            
+            print(f"\n  ✓ Found {alt_count} alternative(s)")
+            print(f"    Confidence: {confidence:.1%}")
+            
+            for i, alt in enumerate(alternatives_data.get('alternatives', []), 1):
+                print(f"    {i}. {alt['product_name']} by {alt['vendor_name']}")
+                print(f"       Confidence: {alt['confidence']:.1%}")
+            
+            if alt_count == 0:
+                print(f"    Note: {alternatives_data.get('note', 'No alternatives found')}")
+            
+            return alternatives_data
+            
+        except json.JSONDecodeError as e:
+            print(f"  ✗ JSON parse error: {e}")
+            return self._fallback_alternatives(str(e))
+        except Exception as e:
+            print(f"  ✗ Alternatives suggestion error: {e}")
+            return self._fallback_alternatives(str(e))
+    
+    def _validate_alternatives(self, data: Dict):
+        """Validate alternatives data structure"""
+        
+        if 'alternatives' not in data:
+            data['alternatives'] = []
+        
+        if 'recommendation_confidence' not in data:
+            data['recommendation_confidence'] = 0.0
+        
+        for alt in data['alternatives']:
+            required = ['product_name', 'vendor_name', 'why_safer', 'confidence']
+            for field in required:
+                if field not in alt:
+                    raise ValueError(f"Alternative missing required field: {field}")
+            
+            if not 0 <= alt['confidence'] <= 1:
+                alt['confidence'] = 0.5
+    
+    def _fallback_alternatives(self, error_msg: str) -> Dict:
+        """Fallback when alternative suggestion fails"""
+        return {
+            'alternatives': [],
+            'recommendation_confidence': 0.0,
+            'rationale': f'Alternative suggestion failed: {error_msg}',
+            'note': 'Unable to recommend alternatives at this time',
+            'suggested_at': datetime.now().isoformat(),
+            'error': error_msg
+        }
+    
+    def compare_with_alternatives(self,
+                                 current_product: Dict,
+                                 alternatives_data: Dict) -> Dict:
+        """
+        Create detailed comparison between current product and alternatives
+        
+        Args:
+            current_product: Full assessment data for current product
+            alternatives_data: Alternatives suggestion data
+            
+        Returns:
+            Comparison matrix with side-by-side analysis
+        """
+        print(f"\n{'='*60}")
+        print(f"📊 Building Comparison Matrix")
+        print(f"{'='*60}")
+        
+        alternatives = alternatives_data.get('alternatives', [])
+        
+        if not alternatives:
+            print("  ℹ No alternatives to compare")
+            return {
+                'comparison_available': False,
+                'note': 'No alternatives available for comparison'
+            }
+        
+        current = {
+            'product_name': current_product['resolution']['product_name'],
+            'vendor_name': current_product['resolution']['vendor_name'],
+            'category': current_product.get('classification', {}).get('primary_subcategory', 'Unknown'),
+            'deployment': current_product.get('classification', {}).get('deployment_model', 'Unknown'),
+            'evidence_quality': current_product.get('evidence_quality', {}).get('quality', 'unknown'),
+            'cisa_kev_entries': current_product.get('sources', {}).get('cisa_kev', {}).get('total_matches', 0),
+            'has_security_page': current_product.get('sources', {}).get('security_page', {}).get('found', False),
+            'has_terms': current_product.get('sources', {}).get('terms_of_service', {}).get('found', False)
+        }
+        
+        comparison = {
+            'current_product': current,
+            'alternatives': [],
+            'comparison_dimensions': [
+                'Security Posture',
+                'Evidence Quality', 
+                'Known Vulnerabilities',
+                'Public Security Docs',
+                'Deployment Model'
+            ],
+            'recommendation': None,
+            'compared_at': datetime.now().isoformat()
+        }
+        
+        for alt in alternatives:
+            alt_summary = {
+                'product_name': alt['product_name'],
+                'vendor_name': alt['vendor_name'],
+                'confidence': alt['confidence'],
+                'security_highlights': alt.get('security_highlights', []),
+                'key_differences': alt.get('key_differences', []),
+                'trade_offs': alt.get('trade_offs', []),
+                'why_safer': alt['why_safer'],
+                'evidence_basis': alt.get('evidence_basis', 'Not specified')
+            }
+            comparison['alternatives'].append(alt_summary)
+        
+        comparison['recommendation'] = self._generate_comparison_recommendation(
+            current, alternatives, alternatives_data
+        )
+        
+        print(f"  ✓ Comparison matrix built with {len(alternatives)} alternative(s)")
+        
+        return comparison
+    
+    def _generate_comparison_recommendation(self,
+                                          current: Dict,
+                                          alternatives: List[Dict],
+                                          alternatives_data: Dict) -> str:
+        """Generate recommendation based on comparison"""
+        
+        confidence = alternatives_data.get('recommendation_confidence', 0)
+        
+        if confidence < 0.5:
+            return "Insufficient evidence to recommend switching. Current product may be appropriate."
+        
+        cisa_kev = current.get('cisa_kev_entries', 0)
+        
+        if cisa_kev > 0:
+            top_alt = alternatives[0] if alternatives else None
+            if top_alt:
+                return f"⚠️ Consider switching to {top_alt['product_name']} - Current product has {cisa_kev} CISA KEV entries. Alternative shows stronger security posture."
+        
+        if len(alternatives) > 0 and alternatives[0]['confidence'] > 0.7:
+            top_alt = alternatives[0]
+            return f"✓ {top_alt['product_name']} recommended - Better security track record with {top_alt.get('evidence_basis', 'strong evidence basis')}."
+        
+        return "Review alternatives carefully. Both current and suggested products have trade-offs."
+    
+    def format_alternatives_report(self,
+                                  current_product: Dict,
+                                  alternatives_data: Dict,
+                                  include_comparison: bool = True) -> str:
+        """Format alternatives into readable report"""
+        
+        current_name = current_product['resolution']['product_name']
+        alternatives = alternatives_data.get('alternatives', [])
+        confidence = alternatives_data.get('recommendation_confidence', 0)
+        
+        report = f"""
+SAFER ALTERNATIVES ANALYSIS
+{'='*60}
+
+Current Product: {current_name}
+Alternatives Found: {len(alternatives)}
+Recommendation Confidence: {confidence:.1%}
+
+Overall Rationale:
+{alternatives_data.get('rationale', 'No rationale provided')}
+"""
+        
+        if alternatives:
+            report += f"\n{'='*60}\n"
+            for i, alt in enumerate(alternatives, 1):
+                report += f"""
+ALTERNATIVE {i}: {alt['product_name']}
+{'-'*60}
+
+Vendor:           {alt['vendor_name']}
+Website:          {alt.get('vendor_website', 'N/A')}
+Confidence:       {alt['confidence']:.1%}
+
+Why Safer:
+{alt['why_safer']}
+
+Security Highlights:
+{self._format_list(alt.get('security_highlights', []))}
+
+Key Differences:
+{self._format_list(alt.get('key_differences', []))}
+
+Trade-offs to Consider:
+{self._format_list(alt.get('trade_offs', []))}
+
+Evidence Basis:
+{alt.get('evidence_basis', 'Not specified')}
+
+"""
+        else:
+            report += f"\n\nNo alternatives recommended.\n"
+            report += f"Note: {alternatives_data.get('note', 'Insufficient evidence')}\n"
+        
+        if include_comparison and alternatives:
+            comparison = self.compare_with_alternatives(current_product, alternatives_data)
+            report += f"\n{'='*60}\n"
+            report += f"COMPARISON MATRIX\n"
+            report += f"{'='*60}\n"
+            report += f"\nRecommendation: {comparison.get('recommendation', 'N/A')}\n"
+        
+        return report
+    
+    def _format_list(self, items: List[str]) -> str:
+        """Format list with bullets"""
+        if not items:
+            return "  • None specified"
+        return "\n".join([f"  • {item}" for item in items])
+    
+    def get_quick_compare_view(self,
+                               current_product: Dict,
+                               alternatives_data: Dict) -> Dict:
+        """Generate quick comparison view for UI display"""
+        
+        alternatives = alternatives_data.get('alternatives', [])
+        
+        if not alternatives:
+            return {
+                'available': False,
+                'message': 'No alternatives available'
+            }
+        
+        current_name = current_product['resolution']['product_name']
+        current_cisa = current_product.get('sources', {}).get('cisa_kev', {}).get('total_matches', 0)
+        current_quality = current_product.get('evidence_quality', {}).get('quality', 'unknown')
+        
+        quick_view = {
+            'available': True,
+            'current': {
+                'name': current_name,
+                'cisa_kev_count': current_cisa,
+                'evidence_quality': current_quality,
+                'status': '⚠️ Has concerns' if current_cisa > 0 else '✓ No critical issues'
+            },
+            'alternatives': [],
+            'recommendation': alternatives_data.get('rationale', '')
+        }
+        
+        for alt in alternatives[:2]:
+            quick_view['alternatives'].append({
+                'name': alt['product_name'],
+                'vendor': alt['vendor_name'],
+                'confidence': f"{alt['confidence']:.0%}",
+                'top_advantage': alt.get('security_highlights', ['Better security posture'])[0],
+                'main_tradeoff': alt.get('trade_offs', ['Review full details'])[0] if alt.get('trade_offs') else 'Review full details'
+            })
+        
+        return quick_view
+
+
+class CompleteAssessmentPipeline:
+    """Complete pipeline: Resolution → Classification → Alternatives"""
+    
+    def __init__(self, enhanced_resolver, alternatives_suggester=None):
+        """
+        Args:
+            enhanced_resolver: EnhancedEntityResolver instance
+            alternatives_suggester: AlternativesSuggester instance (optional)
+        """
+        self.resolver = enhanced_resolver
+        
+        if alternatives_suggester:
+            self.suggester = alternatives_suggester
+        else:
+            self.suggester = AlternativesSuggester(self.resolver.resolver.model)
+        
+        print("✓ Complete Assessment Pipeline initialized")
+    
+    def assess_with_alternatives(self, user_input: str, force_refresh: bool = False) -> Dict:
+        """
+        Complete assessment: resolve, classify, and suggest alternatives
+        
+        Args:
+            user_input: Product name, vendor, or URL
+            force_refresh: Skip cache
+            
+        Returns:
+            Complete assessment with alternatives
+        """
+        assessment = self.resolver.resolve_and_classify(user_input, force_refresh)
+        
+        print(f"\n🎯 Generating alternatives recommendations...")
+        
+        alternatives = self.suggester.suggest_alternatives(
+            assessment['resolution']['product_name'],
+            assessment['resolution']['vendor_name'],
+            assessment.get('classification', {}),
+            assessment.get('sources', {})
+        )
+        
+        assessment['alternatives'] = alternatives
+        
+        self._save_complete_cache(assessment)
+        
+        return assessment
+    
+    def _save_complete_cache(self, data: Dict):
+        """Save complete assessment to cache"""
+        cache_key = data.get('cache_key')
+        if cache_key:
+            cache_file = self.resolver.resolver.cache_dir / f"{cache_key}.json"
+            data['cached_at'] = datetime.now().isoformat()
+            
+            try:
+                with open(cache_file, 'w') as f:
+                    json.dump(data, f, indent=2)
+                print(f"\n  ✓ Complete assessment cached")
+            except Exception as e:
+                print(f"  ⚠ Cache save error: {e}")
+
+
+
+
+
+
+
+
+security_assessor/Python-Modules-Backend/assessor_cli.py
+
+#!/usr/bin/env python3
+"""
+Security Assessor CLI
+Command-line interface for CISO-ready trust briefs
+Uses configuration from config.py which loads .env file
+"""
+
+import sys
+import json
+import argparse
+from pathlib import Path
+from datetime import datetime
+from typing import Optional
+
+# Add Configuration to path and import config
+sys.path.insert(0, str(Path(__file__).parent.parent / 'Configuration'))
+from config import config
+
+# Import all modules (ensure they're in the same directory)
+try:
+    from entity_resolver import EntityResolver
+    from taxonomy_classifier import EnhancedEntityResolver, TaxonomyClassifier
+    from alternative_suggester import AlternativesSuggester, CompleteAssessmentPipeline
+except ImportError as e:
+    print(f"❌ Error importing modules: {e}")
+    print("Ensure all module files are in the same directory:")
+    print("  - entity_resolver.py")
+    print("  - taxonomy_classifier.py")
+    print("  - alternative_suggester.py")
+    sys.exit(1)
+
+
+class AssessorCLI:
+    """Command-line interface for Security Assessor"""
+    
+    def __init__(self, cache_dir: Path = None):
+        """Initialize CLI with cache directory"""
+        self.cache_dir = cache_dir or config.CACHE_DIR
+        
+        # Check for API key
+        if not config.GEMINI_API_KEY:
+            print("❌ GEMINI_API_KEY not set")
+            print("\nSet it in Configuration/.env file:")
+            print("  GEMINI_API_KEY=AIza[your-key-here]")
+            sys.exit(1)
+        
+        # Initialize pipeline
+        try:
+            print("🔧 Initializing Security Assessor...")
+            entity_resolver = EntityResolver(cache_dir=self.cache_dir)
+            enhanced_resolver = EnhancedEntityResolver(entity_resolver)
+            self.pipeline = CompleteAssessmentPipeline(enhanced_resolver)
+            self.suggester = AlternativesSuggester()
+            self.classifier = TaxonomyClassifier()
+            print("✓ Ready\n")
+        except Exception as e:
+            print(f"❌ Initialization failed: {e}")
+            sys.exit(1)
+    
+    def assess(self, target: str, force_refresh: bool = False, output_format: str = "text"):
+        """
+        Assess a software product
+        
+        Args:
+            target: Product name, vendor, or URL
+            force_refresh: Skip cache and fetch fresh data
+            output_format: 'text', 'json', or 'brief'
+        """
+        print(f"{'='*70}")
+        print(f"🔒 SECURITY ASSESSMENT")
+        print(f"{'='*70}")
+        print(f"Target: {target}")
+        print(f"{'='*70}\n")
+        
+        try:
+            # Run complete assessment
+            assessment = self.pipeline.assess_with_alternatives(target, force_refresh)
+            
+            # Format and display output
+            if output_format == "json":
+                self._output_json(assessment)
+            elif output_format == "brief":
+                self._output_brief(assessment)
+            else:
+                self._output_full(assessment)
+            
+            return assessment
+            
+        except Exception as e:
+            print(f"\n❌ Assessment failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
+    def _output_full(self, assessment: dict):
+        """Output full detailed assessment"""
+        
+        resolution = assessment['resolution']
+        classification = assessment.get('classification', {})
+        alternatives = assessment.get('alternatives', {})
+        evidence = assessment.get('evidence_quality', {})
+        
+        print(f"\n{'='*70}")
+        print(f"📋 ENTITY INFORMATION")
+        print(f"{'='*70}")
+        print(f"Product:          {resolution['product_name']}")
+        print(f"Vendor:           {resolution['vendor_name']}")
+        print(f"Website:          {resolution.get('vendor_website', 'N/A')}")
+        print(f"Confidence:       {resolution['confidence']:.1%}")
+        print(f"\nReasoning:")
+        print(f"  {resolution.get('reasoning', 'N/A')}")
+        
+        # Classification
+        if classification:
+            print(f"\n{'='*70}")
+            print(f"🏷️  SOFTWARE TAXONOMY")
+            print(f"{'='*70}")
+            print(f"Primary Category: {classification.get('primary_category', 'Unknown')}")
+            print(f"Subcategory:      {classification.get('primary_subcategory', 'Unknown')}")
+            print(f"Deployment:       {classification.get('deployment_model', 'Unknown')}")
+            print(f"Data Access:      {classification.get('data_access_level', 'Unknown')}")
+            print(f"Confidence:       {classification.get('confidence', 0):.1%}")
+            
+            functions = classification.get('key_functions', [])
+            if functions:
+                print(f"\nKey Functions:")
+                for func in functions:
+                    print(f"  • {func}")
+            
+            print(f"\nEvidence Basis:   {classification.get('evidence_basis', 'unknown').upper()}")
+        
+        # Evidence Quality
+        print(f"\n{'='*70}")
+        print(f"📊 EVIDENCE QUALITY")
+        print(f"{'='*70}")
+        print(f"Overall Quality:  {evidence.get('quality', 'unknown').upper()}")
+        print(f"Sources Found:    {evidence.get('sources_found', 0)}/{evidence.get('sources_attempted', 0)}")
+        print(f"Independent:      {evidence.get('independent_sources', 0)}")
+        print(f"Vendor-Stated:    {evidence.get('vendor_sources', 0)}")
+        
+        # Sources
+        sources = assessment.get('sources', {})
+        print(f"\n{'='*70}")
+        print(f"🔍 HIGH-SIGNAL SOURCES")
+        print(f"{'='*70}")
+        
+        for source_type, source_data in sources.items():
+            if source_data.get('found'):
+                label = source_data.get('source_label', 'unknown')
+                url = source_data.get('url', 'N/A')
+                
+                if source_type == 'cisa_kev':
+                    matches = source_data.get('total_matches', 0)
+                    status = "⚠️ FOUND" if matches > 0 else "✓ CLEAR"
+                    print(f"\n{source_type.upper()}: {status}")
+                    if matches > 0:
+                        print(f"  Entries: {matches}")
+                        print(f"  Source:  {label.upper()}")
+                        for vuln in source_data.get('matches', [])[:3]:
+                            print(f"  • {vuln['cve_id']}: {vuln['vulnerability_name']}")
+                else:
+                    print(f"\n{source_type.upper()}: ✓ Found")
+                    print(f"  URL:    {url}")
+                    print(f"  Source: {label.upper()}")
+            else:
+                if source_type == 'cisa_kev' and source_data.get('note'):
+                    print(f"\n{source_type.upper()}: ✓ CLEAR")
+                    print(f"  Note: {source_data['note']}")
+                else:
+                    print(f"\n{source_type.upper()}: ✗ Not found")
+        
+        # Alternatives
+        if alternatives and alternatives.get('alternatives'):
+            print(f"\n{'='*70}")
+            print(f"🔄 SAFER ALTERNATIVES")
+            print(f"{'='*70}")
+            print(f"Recommendation Confidence: {alternatives.get('recommendation_confidence', 0):.1%}")
+            print(f"\nRationale:")
+            print(f"  {alternatives.get('rationale', 'N/A')}")
+            
+            for i, alt in enumerate(alternatives['alternatives'], 1):
+                print(f"\n{'-'*70}")
+                print(f"ALTERNATIVE {i}: {alt['product_name']} by {alt['vendor_name']}")
+                print(f"{'-'*70}")
+                print(f"Confidence:  {alt['confidence']:.1%}")
+                print(f"Website:     {alt.get('vendor_website', 'N/A')}")
+                
+                print(f"\nWhy Safer:")
+                print(f"  {alt['why_safer']}")
+                
+                highlights = alt.get('security_highlights', [])
+                if highlights:
+                    print(f"\nSecurity Highlights:")
+                    for h in highlights:
+                        print(f"  ✓ {h}")
+                
+                tradeoffs = alt.get('trade_offs', [])
+                if tradeoffs:
+                    print(f"\nTrade-offs:")
+                    for t in tradeoffs:
+                        print(f"  ⚠ {t}")
+        else:
+            print(f"\n{'='*70}")
+            print(f"🔄 SAFER ALTERNATIVES")
+            print(f"{'='*70}")
+            print(f"No alternatives recommended")
+            print(f"Note: {alternatives.get('note', 'Insufficient evidence')}")
+        
+        # Footer
+        print(f"\n{'='*70}")
+        print(f"Assessed at: {assessment.get('resolved_at', 'N/A')}")
+        print(f"Cache key:   {assessment.get('cache_key', 'N/A')}")
+        print(f"{'='*70}\n")
+    
+    def _output_brief(self, assessment: dict):
+        """Output brief summary"""
+        resolution = assessment['resolution']
+        classification = assessment.get('classification', {})
+        evidence = assessment.get('evidence_quality', {})
+        alternatives = assessment.get('alternatives', {})
+        
+        cisa_kev = assessment.get('sources', {}).get('cisa_kev', {})
+        kev_count = cisa_kev.get('total_matches', 0)
+        
+        print(f"\n📋 BRIEF ASSESSMENT SUMMARY")
+        print(f"{'='*70}")
+        print(f"Product:     {resolution['product_name']} by {resolution['vendor_name']}")
+        print(f"Category:    {classification.get('primary_subcategory', 'Unknown')}")
+        print(f"Deployment:  {classification.get('deployment_model', 'Unknown')}")
+        print(f"Evidence:    {evidence.get('quality', 'unknown').upper()} ({evidence.get('sources_found', 0)} sources)")
+        
+        print(f"\n🚨 RISK INDICATORS:")
+        if kev_count > 0:
+            print(f"  ⚠️  CISA KEV: {kev_count} known exploited vulnerabilities")
+        else:
+            print(f"  ✓  CISA KEV: No known exploited vulnerabilities")
+        
+        print(f"  {'⚠️ ' if evidence.get('independent_sources', 0) == 0 else '✓ '} Independent Evidence: {evidence.get('independent_sources', 0)} sources")
+        
+        alts = alternatives.get('alternatives', [])
+        if alts:
+            top_alt = alts[0]
+            print(f"\n💡 TOP ALTERNATIVE:")
+            print(f"  {top_alt['product_name']} by {top_alt['vendor_name']} ({top_alt['confidence']:.0%} confidence)")
+            print(f"  Why: {top_alt.get('security_highlights', ['Better security posture'])[0]}")
+        
+        print(f"{'='*70}\n")
+    
+    def _output_json(self, assessment: dict):
+        """Output JSON format"""
+        print(json.dumps(assessment, indent=2))
+    
+    def compare(self, target1: str, target2: str):
+        """
+        Compare two software products side-by-side
+        
+        Args:
+            target1: First product
+            target2: Second product
+        """
+        print(f"{'='*70}")
+        print(f"⚖️  SECURITY COMPARISON")
+        print(f"{'='*70}\n")
+        
+        print(f"Assessing: {target1}")
+        assessment1 = self.pipeline.assess_with_alternatives(target1)
+        
+        print(f"\n{'='*70}\n")
+        print(f"Assessing: {target2}")
+        assessment2 = self.pipeline.assess_with_alternatives(target2)
+        
+        print(f"\n{'='*70}")
+        print(f"📊 COMPARISON MATRIX")
+        print(f"{'='*70}\n")
+        
+        col1_width = 30
+        col2_width = 35
+        col3_width = 35
+        
+        print(f"{'Dimension':<{col1_width}} | {target1[:33]:<{col2_width}} | {target2[:33]:<{col3_width}}")
+        print(f"{'-'*col1_width}-+-{'-'*col2_width}-+-{'-'*col3_width}")
+        
+        v1 = assessment1['resolution']['vendor_name'][:33]
+        v2 = assessment2['resolution']['vendor_name'][:33]
+        print(f"{'Vendor':<{col1_width}} | {v1:<{col2_width}} | {v2:<{col3_width}}")
+        
+        c1 = assessment1.get('classification', {}).get('primary_subcategory', 'Unknown')[:33]
+        c2 = assessment2.get('classification', {}).get('primary_subcategory', 'Unknown')[:33]
+        print(f"{'Category':<{col1_width}} | {c1:<{col2_width}} | {c2:<{col3_width}}")
+        
+        d1 = assessment1.get('classification', {}).get('deployment_model', 'Unknown')[:33]
+        d2 = assessment2.get('classification', {}).get('deployment_model', 'Unknown')[:33]
+        print(f"{'Deployment':<{col1_width}} | {d1:<{col2_width}} | {d2:<{col3_width}}")
+        
+        e1 = assessment1.get('evidence_quality', {}).get('quality', 'unknown').upper()[:33]
+        e2 = assessment2.get('evidence_quality', {}).get('quality', 'unknown').upper()[:33]
+        print(f"{'Evidence Quality':<{col1_width}} | {e1:<{col2_width}} | {e2:<{col3_width}}")
+        
+        i1 = str(assessment1.get('evidence_quality', {}).get('independent_sources', 0))
+        i2 = str(assessment2.get('evidence_quality', {}).get('independent_sources', 0))
+        print(f"{'Independent Sources':<{col1_width}} | {i1:<{col2_width}} | {i2:<{col3_width}}")
+        
+        k1 = assessment1.get('sources', {}).get('cisa_kev', {}).get('total_matches', 0)
+        k2 = assessment2.get('sources', {}).get('cisa_kev', {}).get('total_matches', 0)
+        k1_str = f"⚠️  {k1} entries" if k1 > 0 else "✓ None"
+        k2_str = f"⚠️  {k2} entries" if k2 > 0 else "✓ None"
+        print(f"{'CISA KEV Status':<{col1_width}} | {k1_str:<{col2_width}} | {k2_str:<{col3_width}}")
+        
+        s1 = "✓ Found" if assessment1.get('sources', {}).get('security_page', {}).get('found') else "✗ Not found"
+        s2 = "✓ Found" if assessment2.get('sources', {}).get('security_page', {}).get('found') else "✗ Not found"
+        print(f"{'Security Page':<{col1_width}} | {s1:<{col2_width}} | {s2:<{col3_width}}")
+        
+        print(f"\n{'='*70}\n")
+        
+        if k1 < k2:
+            print(f"✓ {target1} appears safer (fewer CISA KEV entries)")
+        elif k2 < k1:
+            print(f"✓ {target2} appears safer (fewer CISA KEV entries)")
+        else:
+            print(f"ℹ️  Both products show similar risk profiles")
+            if e1 > e2:
+                print(f"   {target1} has better evidence quality")
+            elif e2 > e1:
+                print(f"   {target2} has better evidence quality")
+        
+        print()
+    
+    def list_cache(self):
+        """List all cached assessments"""
+        print(f"{'='*70}")
+        print(f"📦 CACHED ASSESSMENTS")
+        print(f"{'='*70}\n")
+        
+        if not self.cache_dir.exists():
+            print("No cache directory found")
+            return
+        
+        cache_files = list(self.cache_dir.glob("*.json"))
+        
+        if not cache_files:
+            print("No cached assessments")
+            return
+        
+        print(f"Found {len(cache_files)} cached assessments:\n")
+        
+        for cache_file in sorted(cache_files, key=lambda f: f.stat().st_mtime, reverse=True):
+            try:
+                with open(cache_file, 'r') as f:
+                    data = json.load(f)
+                
+                product = data.get('resolution', {}).get('product_name', 'Unknown')
+                cached_at = data.get('cached_at', 'Unknown')
+                cache_key = cache_file.stem
+                
+                try:
+                    dt = datetime.fromisoformat(cached_at)
+                    age = datetime.now() - dt
+                    age_str = f"{age.days}d ago" if age.days > 0 else f"{age.seconds//3600}h ago"
+                except:
+                    age_str = "unknown age"
+                
+                print(f"• {product}")
+                print(f"  Key: {cache_key}")
+                print(f"  Cached: {age_str} ({cached_at})")
+                print()
+                
+            except Exception as e:
+                print(f"⚠️  Error reading {cache_file.name}: {e}\n")
+    
+    def clear_cache(self, confirm: bool = False):
+        """Clear all cached assessments"""
+        if not self.cache_dir.exists():
+            print("No cache directory found")
+            return
+        
+        cache_files = list(self.cache_dir.glob("*.json"))
+        
+        if not cache_files:
+            print("Cache is already empty")
+            return
+        
+        if not confirm:
+            print(f"⚠️  This will delete {len(cache_files)} cached assessments")
+            response = input("Are you sure? (yes/no): ")
+            if response.lower() != 'yes':
+                print("Cancelled")
+                return
+        
+        for cache_file in cache_files:
+            try:
+                cache_file.unlink()
+            except Exception as e:
+                print(f"⚠️  Error deleting {cache_file.name}: {e}")
+        
+        print(f"✓ Cleared {len(cache_files)} cached assessments")
+
+
+def main():
+    """Main CLI entry point"""
+    parser = argparse.ArgumentParser(
+        description="Security Assessor - CISO-ready trust briefs for software",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s assess "Slack"
+  %(prog)s assess "https://github.com" --refresh
+  %(prog)s assess "Zoom" --format brief
+  %(prog)s compare "Zoom" "Microsoft Teams"
+  %(prog)s list-cache
+  %(prog)s clear-cache
+        """
+    )
+    
+    parser.add_argument('command', 
+                       choices=['assess', 'compare', 'list-cache', 'clear-cache'],
+                       help='Command to execute')
+    
+    parser.add_argument('targets', nargs='*',
+                       help='Product name(s), vendor, or URL(s)')
+    
+    parser.add_argument('--refresh', action='store_true',
+                       help='Force refresh (skip cache)')
+    
+    parser.add_argument('--format', choices=['text', 'json', 'brief'],
+                       default='text',
+                       help='Output format (default: text)')
+    
+    parser.add_argument('--cache-dir', default=None,
+                       help='Cache directory (default: from config)')
+    
+    args = parser.parse_args()
+    
+    # Initialize CLI
+    cache_dir = Path(args.cache_dir) if args.cache_dir else None
+    cli = AssessorCLI(cache_dir=cache_dir)
+    
+    # Execute command
+    if args.command == 'assess':
+        if not args.targets:
+            print("❌ Error: 'assess' requires a target")
+            print("Usage: assessor_cli.py assess <product|vendor|url>")
+            sys.exit(1)
+        
+        cli.assess(args.targets[0], force_refresh=args.refresh, output_format=args.format)
+    
+    elif args.command == 'compare':
+        if len(args.targets) < 2:
+            print("❌ Error: 'compare' requires two targets")
+            print("Usage: assessor_cli.py compare <product1> <product2>")
+            sys.exit(1)
+        
+        cli.compare(args.targets[0], args.targets[1])
+    
+    elif args.command == 'list-cache':
+        cli.list_cache()
+    
+    elif args.command == 'clear-cache':
+        cli.clear_cache()
+
+
+if __name__ == "__main__":
+    main()
+
+
+
+
+
+
+
+security_assessor/Python-Modules-Backend/entity_resolver.py
+
+"""
+Entity Resolution Module for Security Assessor
+Uses configuration from config.py which loads .env file
+"""
+
+import json
+import hashlib
+from datetime import datetime
+from pathlib import Path
+from urllib.parse import urlparse
+from typing import Dict, List, Optional, Tuple
+
+import requests
+import google.generativeai as genai
+
+# Add Configuration to path and import config
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent / 'Configuration'))
+from config import config
+
+
+class EntityResolver:
+    """Resolves and enriches entity information with persistent caching"""
+    
+    def __init__(self, cache_dir: Path = None):
+        """
+        Initialize the resolver with cache and API configuration
+        
+        Args:
+            cache_dir: Directory for persistent cache storage (uses config if None)
+        """
+        self.cache_dir = cache_dir or config.CACHE_DIR
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize Gemini with config API key
+        if not config.GEMINI_API_KEY:
+            raise ValueError("Gemini API key required. Set GEMINI_API_KEY in Configuration/.env")
+        
+        genai.configure(api_key=config.GEMINI_API_KEY)
+        self.model = genai.GenerativeModel(config.GEMINI_MODEL)
+        
+        print(f"✓ Entity Resolver initialized with cache at {self.cache_dir}")
+    
+    def _get_cache_key(self, input_text: str) -> str:
+        """Generate consistent cache key from input"""
+        return hashlib.sha256(input_text.lower().strip().encode()).hexdigest()[:16]
+    
+    def _load_from_cache(self, cache_key: str) -> Optional[Dict]:
+        """Load cached entity data if it exists and is recent"""
+        cache_file = self.cache_dir / f"{cache_key}.json"
+        
+        if not cache_file.exists():
+            return None
+        
+        try:
+            with open(cache_file, 'r') as f:
+                data = json.load(f)
+            
+            cached_time = datetime.fromisoformat(data.get('cached_at', '2000-01-01'))
+            age_days = (datetime.now() - cached_time).days
+            
+            if age_days > config.CACHE_TTL_DAYS:
+                print(f"  ⚠ Cache stale ({age_days} days old), will refresh")
+                return None
+            
+            print(f"  ✓ Using cached data ({age_days} days old)")
+            return data
+            
+        except Exception as e:
+            print(f"  ⚠ Cache read error: {e}")
+            return None
+    
+    def _save_to_cache(self, cache_key: str, data: Dict):
+        """Save entity data to persistent cache"""
+        cache_file = self.cache_dir / f"{cache_key}.json"
+        data['cached_at'] = datetime.now().isoformat()
+        
+        try:
+            with open(cache_file, 'w') as f:
+                json.dump(data, f, indent=2)
+            print(f"  ✓ Cached to {cache_file.name}")
+        except Exception as e:
+            print(f"  ⚠ Cache write error: {e}")
+    
+    def _extract_domain_from_input(self, user_input: str) -> Optional[str]:
+        """Extract domain from URL or return None"""
+        user_input = user_input.strip()
+        
+        if '://' in user_input or user_input.startswith('www.'):
+            if not user_input.startswith('http'):
+                user_input = 'https://' + user_input
+            
+            parsed = urlparse(user_input)
+            domain = parsed.netloc or parsed.path
+            domain = domain.replace('www.', '')
+            return domain if domain else None
+        
+        return None
+    
+    def _resolve_entity_with_gemini(self, user_input: str, domain: Optional[str]) -> Dict:
+        """Use Gemini to resolve entity identity from minimal input"""
+        
+        prompt = f"""Given this input: "{user_input}"
+{f'Extracted domain: {domain}' if domain else ''}
+
+Your task: Identify the SOFTWARE PRODUCT and VENDOR company.
+
+Respond ONLY with valid JSON (no markdown, no extra text):
+{{
+  "product_name": "Official product name",
+  "vendor_name": "Company that makes it",
+  "vendor_website": "Primary vendor website URL",
+  "confidence": 0.0-1.0,
+  "reasoning": "Brief explanation of identification",
+  "alternative_names": ["alias1", "alias2"]
+}}
+
+If you cannot identify it confidently, set confidence < 0.5 and explain why.
+"""
+        
+        try:
+            response = self.model.generate_content(prompt)
+            text = response.text.strip()
+            
+            if text.startswith('```'):
+                text = text.split('```')[1]
+                if text.startswith('json'):
+                    text = text[4:]
+                text = text.strip()
+            
+            entity_data = json.loads(text)
+            return entity_data
+            
+        except Exception as e:
+            print(f"  ✗ Gemini resolution failed: {e}")
+            return {
+                "product_name": "Unknown",
+                "vendor_name": "Unknown",
+                "vendor_website": domain or "Unknown",
+                "confidence": 0.0,
+                "reasoning": f"Resolution failed: {str(e)}",
+                "alternative_names": []
+            }
+    
+    def _fetch_url_safely(self, url: str, timeout: int = None) -> Tuple[Optional[str], str]:
+        """Fetch URL content with error handling"""
+        timeout = timeout or config.REQUEST_TIMEOUT
+        
+        try:
+            headers = {
+                'User-Agent': config.USER_AGENT,
+                'Accept': 'text/html,application/json'
+            }
+            
+            response = requests.get(url, headers=headers, timeout=timeout, allow_redirects=True)
+            response.raise_for_status()
+            
+            parsed = urlparse(url)
+            source_type = "vendor-stated"
+            
+            if any(ind in parsed.netloc for ind in ['cve.mitre.org', 'nvd.nist.gov', 'cisa.gov', 
+                                                      'cert.org', 'kb.cert.org', 'securityscorecard']):
+                source_type = "independent"
+            
+            return response.text, source_type
+            
+        except requests.exceptions.Timeout:
+            print(f"    ⏱ Timeout fetching {url}")
+            return None, "error"
+        except requests.exceptions.RequestException as e:
+            print(f"    ✗ Error fetching {url}: {e}")
+            return None, "error"
+    
+    def _find_high_signal_sources(self, vendor_website: str, product_name: str, vendor_name: str) -> Dict[str, Dict]:
+        """Discover and fetch high-signal security sources"""
+        sources = {}
+        
+        if not vendor_website or vendor_website == "Unknown":
+            return sources
+        
+        base_domain = vendor_website.replace('https://', '').replace('http://', '').split('/')[0]
+        
+        patterns = {
+            'security_page': [
+                f'https://{base_domain}/security',
+                f'https://{base_domain}/trust',
+                f'https://{base_domain}/compliance',
+                f'https://{base_domain}/trust-center'
+            ],
+            'terms_of_service': [
+                f'https://{base_domain}/terms',
+                f'https://{base_domain}/tos',
+                f'https://{base_domain}/legal/terms'
+            ],
+            'privacy_policy': [
+                f'https://{base_domain}/privacy',
+                f'https://{base_domain}/legal/privacy'
+            ],
+            'psirt_page': [
+                f'https://{base_domain}/psirt',
+                f'https://{base_domain}/security/advisories'
+            ]
+        }
+        
+        print(f"\n  🔍 Searching for high-signal sources...")
+        
+        for source_type, urls in patterns.items():
+            sources[source_type] = {'found': False, 'url': None, 'content': None, 'source_label': None}
+            
+            for url in urls:
+                print(f"    Trying {source_type}: {url}")
+                content, source_label = self._fetch_url_safely(url)
+                
+                if content and len(content) > 500 and '404' not in content[:1000].lower():
+                    sources[source_type] = {
+                        'found': True,
+                        'url': url,
+                        'content': content[:5000],
+                        'source_label': source_label,
+                        'fetched_at': datetime.now().isoformat()
+                    }
+                    print(f"      ✓ Found {source_type}")
+                    break
+        
+        print(f"    Checking CISA KEV catalog...")
+        sources['cisa_kev'] = self._check_cisa_kev(vendor_name, product_name)
+        
+        return sources
+    
+    def _check_cisa_kev(self, vendor_name: str, product_name: str) -> Dict:
+        """Check CISA Known Exploited Vulnerabilities catalog"""
+        kev_url = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+        
+        content, _ = self._fetch_url_safely(kev_url, timeout=config.CISA_KEV_TIMEOUT)
+        
+        if not content:
+            return {'found': False, 'source_label': 'independent'}
+        
+        try:
+            kev_data = json.loads(content)
+            vulnerabilities = kev_data.get('vulnerabilities', [])
+            
+            matches = []
+            for vuln in vulnerabilities:
+                vendor_match = vendor_name.lower() in vuln.get('vendorProject', '').lower()
+                product_match = product_name.lower() in vuln.get('product', '').lower()
+                
+                if vendor_match or product_match:
+                    matches.append({
+                        'cve_id': vuln.get('cveID'),
+                        'vulnerability_name': vuln.get('vulnerabilityName'),
+                        'date_added': vuln.get('dateAdded'),
+                        'required_action': vuln.get('requiredAction')
+                    })
+            
+            if matches:
+                print(f"      ⚠ Found {len(matches)} CISA KEV entries")
+                return {
+                    'found': True,
+                    'url': kev_url,
+                    'matches': matches[:5],
+                    'total_matches': len(matches),
+                    'source_label': 'independent'
+                }
+            else:
+                print(f"      ✓ No CISA KEV entries (good sign)")
+                return {'found': False, 'source_label': 'independent', 'note': 'No known exploited vulnerabilities'}
+                
+        except Exception as e:
+            print(f"      ✗ CISA KEV parse error: {e}")
+            return {'found': False, 'source_label': 'independent', 'error': str(e)}
+    
+    def resolve(self, user_input: str, force_refresh: bool = False) -> Dict:
+        """Main resolution method"""
+        print(f"\n{'='*60}")
+        print(f"🔎 Resolving: {user_input}")
+        print(f"{'='*60}")
+        
+        cache_key = self._get_cache_key(user_input)
+        
+        if not force_refresh:
+            cached = self._load_from_cache(cache_key)
+            if cached:
+                return cached
+        
+        domain = self._extract_domain_from_input(user_input)
+        
+        print(f"\n📋 Step 1: Identifying product and vendor...")
+        entity = self._resolve_entity_with_gemini(user_input, domain)
+        
+        confidence = entity.get('confidence', 0)
+        print(f"  Product: {entity.get('product_name')}")
+        print(f"  Vendor: {entity.get('vendor_name')}")
+        print(f"  Confidence: {confidence:.1%}")
+        
+        if confidence >= 0.5:
+            print(f"\n📡 Step 2: Fetching high-signal sources...")
+            sources = self._find_high_signal_sources(
+                entity.get('vendor_website', ''),
+                entity.get('product_name', ''),
+                entity.get('vendor_name', '')
+            )
+        else:
+            print(f"\n⚠ Low confidence resolution - skipping source fetch")
+            sources = {}
+        
+        result = {
+            'input': user_input,
+            'resolution': entity,
+            'sources': sources,
+            'evidence_quality': self._assess_evidence_quality(sources),
+            'resolved_at': datetime.now().isoformat(),
+            'cache_key': cache_key
+        }
+        
+        self._save_to_cache(cache_key, result)
+        
+        print(f"\n{'='*60}")
+        print(f"✓ Resolution complete")
+        print(f"{'='*60}\n")
+        
+        return result
+    
+    def _assess_evidence_quality(self, sources: Dict) -> Dict:
+        """Assess quality and completeness of gathered evidence"""
+        
+        found_count = sum(1 for s in sources.values() if s.get('found', False))
+        total_sources = len(sources)
+        
+        independent_count = sum(1 for s in sources.values() 
+                               if s.get('found') and s.get('source_label') == 'independent')
+        
+        vendor_count = sum(1 for s in sources.values() 
+                          if s.get('found') and s.get('source_label') == 'vendor-stated')
+        
+        quality = "insufficient"
+        if found_count >= 3 and independent_count >= 1:
+            quality = "good"
+        elif found_count >= 2:
+            quality = "moderate"
+        elif found_count == 1:
+            quality = "limited"
+        
+        return {
+            'quality': quality,
+            'sources_found': found_count,
+            'sources_attempted': total_sources,
+            'independent_sources': independent_count,
+            'vendor_sources': vendor_count,
+            'note': 'Good' if quality == 'good' else 'Insufficient public evidence' if quality == 'insufficient' else 'Limited evidence'
+        }
+
+
+
+
+
+
+
+security_assessor/Python-Modules-Backend/taxonomy_classifier.py
+
+"""
+Software Taxonomy Classifier
+Uses configuration from config.py which loads .env file
+"""
+
+import json
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Optional
+import google.generativeai as genai
+
+# Add Configuration to path and import config
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent / 'Configuration'))
+from config import config
+
+
+class TaxonomyClassifier:
+    """Classifies software into security-relevant categories"""
+    
+    TAXONOMY_CATEGORIES = {
+        "Communication & Collaboration": [
+            "Team Chat/Messaging",
+            "Video Conferencing", 
+            "Email Service",
+            "Project Management"
+        ],
+        "Data & Storage": [
+            "File Sharing/Storage",
+            "Database Service",
+            "Backup/Archive",
+            "Content Management"
+        ],
+        "Development & DevOps": [
+            "Code Repository",
+            "CI/CD Pipeline",
+            "Container/Orchestration",
+            "API Management",
+            "Development Tool"
+        ],
+        "AI & Machine Learning": [
+            "GenAI Tool/Assistant",
+            "ML Platform",
+            "AI API Service"
+        ],
+        "Business Applications": [
+            "CRM System",
+            "ERP System",
+            "HR/Payroll",
+            "Marketing Automation",
+            "Analytics/BI"
+        ],
+        "Security & Infrastructure": [
+            "Endpoint Agent/EDR",
+            "Identity/SSO",
+            "Network Security",
+            "Cloud Infrastructure",
+            "Monitoring/Observability"
+        ],
+        "Productivity": [
+            "Document Editor",
+            "Calendar/Scheduling",
+            "Note-taking",
+            "Form/Survey"
+        ]
+    }
+    
+    def __init__(self, gemini_model=None):
+        """
+        Initialize classifier
+        
+        Args:
+            gemini_model: Existing Gemini model instance (or creates new one with config)
+        """
+        if gemini_model:
+            self.model = gemini_model
+        else:
+            genai.configure(api_key=config.GEMINI_API_KEY)
+            self.model = genai.GenerativeModel(config.GEMINI_MODEL)
+        
+        print("✓ Taxonomy Classifier initialized")
+    
+    def _build_taxonomy_prompt(self, entity_data: Dict, sources: Dict) -> str:
+        """Build structured prompt for classification"""
+        
+        product_name = entity_data.get('product_name', 'Unknown')
+        vendor_name = entity_data.get('vendor_name', 'Unknown')
+        
+        evidence_snippets = []
+        
+        for source_type, source_data in sources.items():
+            if source_data.get('found'):
+                label = source_data.get('source_label', 'unknown')
+                
+                if source_type == 'cisa_kev' and source_data.get('matches'):
+                    evidence_snippets.append(
+                        f"[INDEPENDENT - CISA KEV] Product found in Known Exploited Vulnerabilities catalog"
+                    )
+                else:
+                    content = source_data.get('content', '')[:500]
+                    if content:
+                        evidence_snippets.append(
+                            f"[{label.upper()} - {source_type}] {content}..."
+                        )
+        
+        evidence_text = "\n".join(evidence_snippets) if evidence_snippets else "No source evidence available"
+        
+        taxonomy_text = "\n".join([
+            f"  {category}:\n" + "\n".join([f"    - {subcat}" for subcat in subcats])
+            for category, subcats in self.TAXONOMY_CATEGORIES.items()
+        ])
+        
+        prompt = f"""You are a cybersecurity expert classifying software for risk assessment.
+
+PRODUCT: {product_name}
+VENDOR: {vendor_name}
+
+EVIDENCE FROM SOURCES:
+{evidence_text}
+
+AVAILABLE TAXONOMY CATEGORIES:
+{taxonomy_text}
+
+Your task:
+1. Classify this software into ONE primary category and subcategory
+2. Identify up to 2 secondary categories if product has multiple functions
+3. Provide confidence score (0.0-1.0) based on evidence quality
+4. Cite which sources informed your classification
+5. Note if classification is based on vendor claims vs independent evidence
+
+Respond ONLY with valid JSON (no markdown, no extra text):
+{{
+  "primary_category": "Category",
+  "primary_subcategory": "Subcategory",
+  "secondary_categories": [
+    {{"category": "Category", "subcategory": "Subcategory"}}
+  ],
+  "confidence": 0.0-1.0,
+  "reasoning": "Clear explanation citing sources",
+  "evidence_basis": "vendor-stated | mixed | independent | insufficient",
+  "source_citations": ["source_type that informed classification"],
+  "key_functions": ["function1", "function2", "function3"],
+  "deployment_model": "SaaS | On-premise | Hybrid | Client-side | API",
+  "data_access_level": "high | medium | low | none"
+}}
+
+CRITICAL: If evidence is insufficient or contradictory, set confidence < 0.5 and note "Insufficient public evidence" in reasoning.
+"""
+        return prompt
+    
+    def classify(self, entity_data: Dict, sources: Dict) -> Dict:
+        """
+        Classify software into taxonomy using entity data and sources
+        
+        Args:
+            entity_data: Resolved entity information from EntityResolver
+            sources: High-signal sources from EntityResolver
+            
+        Returns:
+            Classification result with confidence and citations
+        """
+        print(f"\n{'='*60}")
+        print(f"🏷️  Classifying Software Taxonomy")
+        print(f"{'='*60}")
+        
+        product_name = entity_data.get('product_name', 'Unknown')
+        confidence = entity_data.get('confidence', 0)
+        
+        if confidence < 0.5:
+            return {
+                'primary_category': 'Unknown',
+                'primary_subcategory': 'Unknown',
+                'secondary_categories': [],
+                'confidence': 0.0,
+                'reasoning': 'Cannot classify - entity resolution confidence too low',
+                'evidence_basis': 'insufficient',
+                'source_citations': [],
+                'key_functions': [],
+                'deployment_model': 'Unknown',
+                'data_access_level': 'unknown',
+                'classified_at': datetime.now().isoformat()
+            }
+        
+        prompt = self._build_taxonomy_prompt(entity_data, sources)
+        
+        try:
+            print(f"  🤖 Analyzing {product_name} with Gemini...")
+            response = self.model.generate_content(prompt)
+            text = response.text.strip()
+            
+            if text.startswith('```'):
+                text = text.split('```')[1]
+                if text.startswith('json'):
+                    text = text[4:]
+                text = text.strip()
+            
+            classification = json.loads(text)
+            classification['classified_at'] = datetime.now().isoformat()
+            
+            self._validate_classification(classification)
+            
+            print(f"\n  ✓ Classification complete:")
+            print(f"    Primary: {classification['primary_category']} → {classification['primary_subcategory']}")
+            print(f"    Confidence: {classification['confidence']:.1%}")
+            print(f"    Evidence Basis: {classification['evidence_basis']}")
+            print(f"    Deployment: {classification['deployment_model']}")
+            print(f"    Data Access: {classification['data_access_level']}")
+            
+            if classification.get('secondary_categories'):
+                print(f"    Secondary: {len(classification['secondary_categories'])} additional categories")
+            
+            return classification
+            
+        except json.JSONDecodeError as e:
+            print(f"  ✗ JSON parse error: {e}")
+            return self._fallback_classification(entity_data, str(e))
+        except Exception as e:
+            print(f"  ✗ Classification error: {e}")
+            return self._fallback_classification(entity_data, str(e))
+    
+    def _validate_classification(self, classification: Dict):
+        """Validate classification structure and values"""
+        
+        required = ['primary_category', 'primary_subcategory', 'confidence', 
+                   'reasoning', 'evidence_basis']
+        
+        for field in required:
+            if field not in classification:
+                raise ValueError(f"Missing required field: {field}")
+        
+        confidence = classification['confidence']
+        if not 0 <= confidence <= 1:
+            raise ValueError(f"Confidence must be 0-1, got {confidence}")
+        
+        valid_basis = ['vendor-stated', 'mixed', 'independent', 'insufficient']
+        if classification['evidence_basis'] not in valid_basis:
+            print(f"  ⚠ Invalid evidence_basis, defaulting to 'insufficient'")
+            classification['evidence_basis'] = 'insufficient'
+    
+    def _fallback_classification(self, entity_data: Dict, error_msg: str) -> Dict:
+        """Provide fallback classification when AI fails"""
+        return {
+            'primary_category': 'Unknown',
+            'primary_subcategory': 'Unclassified',
+            'secondary_categories': [],
+            'confidence': 0.0,
+            'reasoning': f'Classification failed: {error_msg}',
+            'evidence_basis': 'insufficient',
+            'source_citations': [],
+            'key_functions': [],
+            'deployment_model': 'Unknown',
+            'data_access_level': 'unknown',
+            'classified_at': datetime.now().isoformat(),
+            'error': error_msg
+        }
+    
+    def get_category_risk_profile(self, primary_category: str, primary_subcategory: str) -> Dict:
+        """Get typical risk profile for a category"""
+        
+        risk_profiles = {
+            "File Sharing/Storage": {
+                "typical_risks": [
+                    "Data exfiltration",
+                    "Unauthorized sharing",
+                    "Compliance violations (GDPR, HIPAA)",
+                    "Shadow IT proliferation"
+                ],
+                "data_sensitivity": "high",
+                "common_controls": ["DLP", "Access controls", "Encryption at rest/transit"]
+            },
+            "GenAI Tool/Assistant": {
+                "typical_risks": [
+                    "Data leakage to training",
+                    "Prompt injection attacks",
+                    "Intellectual property exposure",
+                    "Hallucination/accuracy issues"
+                ],
+                "data_sensitivity": "high",
+                "common_controls": ["Data residency", "Terms review", "Input filtering"]
+            },
+            "Endpoint Agent/EDR": {
+                "typical_risks": [
+                    "Privileged access abuse",
+                    "Performance impact",
+                    "Single point of failure",
+                    "Supply chain compromise"
+                ],
+                "data_sensitivity": "high",
+                "common_controls": ["Vendor security audit", "Least privilege", "Monitoring"]
+            },
+            "Team Chat/Messaging": {
+                "typical_risks": [
+                    "Data retention issues",
+                    "Insider threats",
+                    "Third-party app risks",
+                    "Compliance gaps"
+                ],
+                "data_sensitivity": "medium-high",
+                "common_controls": ["Message retention policies", "App approval process", "E2E encryption"]
+            },
+            "CRM System": {
+                "typical_risks": [
+                    "Customer data breach",
+                    "Integration vulnerabilities",
+                    "Access control failures",
+                    "GDPR/privacy violations"
+                ],
+                "data_sensitivity": "high",
+                "common_controls": ["Role-based access", "Audit logging", "Data encryption"]
+            }
+        }
+        
+        profile = risk_profiles.get(primary_subcategory, {
+            "typical_risks": ["General software risks apply"],
+            "data_sensitivity": "medium",
+            "common_controls": ["Standard security controls"]
+        })
+        
+        return profile
+    
+    def format_classification_summary(self, classification: Dict) -> str:
+        """Format classification into readable summary"""
+        
+        confidence = classification.get('confidence', 0)
+        evidence = classification.get('evidence_basis', 'unknown')
+        
+        summary = f"""
+TAXONOMY CLASSIFICATION
+{'='*60}
+
+Primary Category:     {classification.get('primary_category', 'Unknown')}
+Subcategory:          {classification.get('primary_subcategory', 'Unknown')}
+Confidence:           {confidence:.1%}
+
+Evidence Basis:       {evidence.upper()}
+Deployment Model:     {classification.get('deployment_model', 'Unknown')}
+Data Access Level:    {classification.get('data_access_level', 'Unknown')}
+
+Key Functions:
+{self._format_list(classification.get('key_functions', []))}
+
+Reasoning:
+{classification.get('reasoning', 'No reasoning provided')}
+
+Source Citations:
+{self._format_list(classification.get('source_citations', []))}
+"""
+        
+        secondary = classification.get('secondary_categories', [])
+        if secondary:
+            summary += f"\nSecondary Categories:\n"
+            for sec in secondary:
+                summary += f"  • {sec.get('category')} → {sec.get('subcategory')}\n"
+        
+        risk_profile = self.get_category_risk_profile(
+            classification.get('primary_category', ''),
+            classification.get('primary_subcategory', '')
+        )
+        
+        if risk_profile.get('typical_risks'):
+            summary += f"\nTypical Risks for This Category:\n"
+            summary += self._format_list(risk_profile['typical_risks'])
+        
+        return summary
+    
+    def _format_list(self, items: List[str]) -> str:
+        """Format list with bullets"""
+        if not items:
+            return "  • None"
+        return "\n".join([f"  • {item}" for item in items])
+
+
+class EnhancedEntityResolver:
+    """Enhanced resolver that includes taxonomy classification"""
+    
+    def __init__(self, entity_resolver, taxonomy_classifier=None):
+        """
+        Args:
+            entity_resolver: EntityResolver instance
+            taxonomy_classifier: TaxonomyClassifier instance (optional)
+        """
+        self.resolver = entity_resolver
+        
+        if taxonomy_classifier:
+            self.classifier = taxonomy_classifier
+        else:
+            self.classifier = TaxonomyClassifier(self.resolver.model)
+        
+        print("✓ Enhanced Entity Resolver initialized")
+    
+    def resolve_and_classify(self, user_input: str, force_refresh: bool = False) -> Dict:
+        """
+        Complete resolution: entity + taxonomy classification
+        
+        Args:
+            user_input: Product name, vendor, or URL
+            force_refresh: Skip cache and fetch fresh data
+            
+        Returns:
+            Complete entity data with classification
+        """
+        entity_result = self.resolver.resolve(user_input, force_refresh)
+        
+        print(f"\n📊 Adding taxonomy classification...")
+        
+        classification = self.classifier.classify(
+            entity_result['resolution'],
+            entity_result['sources']
+        )
+        
+        entity_result['classification'] = classification
+        
+        entity_result['evidence_quality']['classification_confidence'] = classification['confidence']
+        
+        self._save_enhanced_cache(entity_result)
+        
+        return entity_result
+    
+    def _save_enhanced_cache(self, data: Dict):
+        """Save enhanced data to cache"""
+        cache_key = data.get('cache_key')
+        if cache_key:
+            cache_file = self.resolver.cache_dir / f"{cache_key}.json"
+            data['cached_at'] = datetime.now().isoformat()
+            
+            try:
+                with open(cache_file, 'w') as f:
+                    json.dump(data, f, indent=2)
+            except Exception as e:
+                print(f"  ⚠ Enhanced cache save error: {e}")
+
+
+
+
+
+security_assessor/Python-Modules-Backend/web_backend.py
+
+"""
+Flask Backend API for Security Assessor Web UI
+Uses configuration from config.py which loads .env file
+"""
+
+import sys
+import json
+import traceback
+from pathlib import Path
+from datetime import datetime
+
+# Add Configuration to path and import config
+sys.path.insert(0, str(Path(__file__).parent.parent / 'Configuration'))
+from config import config, Config
+
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+
+# Import assessment modules
+try:
+    from entity_resolver import EntityResolver
+    from taxonomy_classifier import EnhancedEntityResolver, TaxonomyClassifier
+    from alternative_suggester import AlternativesSuggester, CompleteAssessmentPipeline
+    print("✓ All modules imported successfully")
+except ImportError as e:
+    print(f"❌ Error importing modules: {e}")
+    sys.exit(1)
+
+# Initialize Flask app
+app = Flask(__name__)
+CORS(app)
+
+# Configure Flask from config
+app.config['SECRET_KEY'] = config.SECRET_KEY
+app.config['DEBUG'] = config.DEBUG
+app.config['ENV'] = config.FLASK_ENV
+
+# Create directories
+config.CACHE_DIR.mkdir(parents=True, exist_ok=True)
+Path('./logs').mkdir(exist_ok=True)
+
+# Initialize assessment pipeline (singleton)
+print("\n🔧 Initializing Security Assessor Pipeline...")
+
+try:
+    entity_resolver = EntityResolver(cache_dir=config.CACHE_DIR)
+    enhanced_resolver = EnhancedEntityResolver(entity_resolver)
+    pipeline = CompleteAssessmentPipeline(enhanced_resolver)
+    suggester = AlternativesSuggester()
+    classifier = TaxonomyClassifier()
+    print("✓ Pipeline initialized successfully\n")
+except Exception as e:
+    print(f"❌ Pipeline initialization failed: {e}")
+    traceback.print_exc()
+    sys.exit(1)
+
+# Display configuration
+Config.display()
+
+
+# ============================================================================
+# API ROUTES
+# ============================================================================
+
+@app.route('/')
+def index():
+    """Serve basic info page"""
+    return jsonify({
+        'service': 'Security Assessor API',
+        'version': '1.0',
+        'environment': config.FLASK_ENV,
+        'endpoints': {
+            'assess': 'POST /api/assess',
+            'compare': 'POST /api/compare',
+            'cache': 'GET /api/cache',
+            'cache_detail': 'GET /api/cache/<cache_key>',
+            'clear_cache': 'DELETE /api/cache',
+            'health': 'GET /api/health',
+            'config': 'GET /api/config'
+        },
+        'status': 'operational'
+    })
+
+
+@app.route('/api/assess', methods=['POST'])
+def assess():
+    """
+    Assess a software product
+    
+    Request: {"target": "Slack", "force_refresh": false}
+    """
+    try:
+        data = request.json or {}
+        target = data.get('target')
+        force_refresh = data.get('force_refresh', False)
+        
+        if not target or not target.strip():
+            return jsonify({
+                'error': 'Target required',
+                'message': 'Please provide a product name, vendor, or URL'
+            }), 400
+        
+        print(f"\n📋 API Request: Assess '{target}' (refresh={force_refresh})")
+        
+        result = pipeline.assess_with_alternatives(target, force_refresh)
+        
+        result['api_metadata'] = {
+            'assessed_via': 'api',
+            'timestamp': datetime.now().isoformat(),
+            'force_refresh': force_refresh
+        }
+        
+        print(f"✓ Assessment complete for '{target}'")
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"✗ Assessment error: {e}")
+        traceback.print_exc()
+        return jsonify({
+            'error': 'Assessment failed',
+            'message': str(e),
+            'type': type(e).__name__
+        }), 500
+
+
+@app.route('/api/compare', methods=['POST'])
+def compare():
+    """
+    Compare two software products
+    
+    Request: {"target1": "Slack", "target2": "Teams"}
+    """
+    try:
+        data = request.json or {}
+        target1 = data.get('target1')
+        target2 = data.get('target2')
+        
+        if not target1 or not target2:
+            return jsonify({
+                'error': 'Both targets required',
+                'message': 'Please provide two products to compare'
+            }), 400
+        
+        print(f"\n⚖️  API Request: Compare '{target1}' vs '{target2}'")
+        
+        result1 = pipeline.assess_with_alternatives(target1)
+        result2 = pipeline.assess_with_alternatives(target2)
+        
+        comparison = {
+            'product1': result1,
+            'product2': result2,
+            'comparison_metadata': {
+                'compared_at': datetime.now().isoformat(),
+                'target1': target1,
+                'target2': target2
+            }
+        }
+        
+        print(f"✓ Comparison complete")
+        
+        return jsonify(comparison)
+        
+    except Exception as e:
+        print(f"✗ Comparison error: {e}")
+        traceback.print_exc()
+        return jsonify({
+            'error': 'Comparison failed',
+            'message': str(e),
+            'type': type(e).__name__
+        }), 500
+
+
+@app.route('/api/cache', methods=['GET'])
+def list_cache():
+    """List all cached assessments"""
+    try:
+        cache_dir = config.CACHE_DIR
+        
+        if not cache_dir.exists():
+            return jsonify({'items': [], 'count': 0, 'cache_dir': str(cache_dir)})
+        
+        items = []
+        cache_files = sorted(cache_dir.glob('*.json'), 
+                           key=lambda f: f.stat().st_mtime, 
+                           reverse=True)
+        
+        for cache_file in cache_files:
+            try:
+                with open(cache_file, 'r') as f:
+                    data = json.load(f)
+                
+                cached_at = data.get('cached_at')
+                age_str = 'unknown'
+                if cached_at:
+                    try:
+                        dt = datetime.fromisoformat(cached_at)
+                        age = datetime.now() - dt
+                        if age.days > 0:
+                            age_str = f"{age.days}d ago"
+                        else:
+                            hours = age.seconds // 3600
+                            age_str = f"{hours}h ago" if hours > 0 else "< 1h ago"
+                    except:
+                        pass
+                
+                items.append({
+                    'cache_key': cache_file.stem,
+                    'product_name': data.get('resolution', {}).get('product_name', 'Unknown'),
+                    'vendor_name': data.get('resolution', {}).get('vendor_name', 'Unknown'),
+                    'category': data.get('classification', {}).get('primary_subcategory', 'Unknown'),
+                    'cached_at': cached_at,
+                    'age': age_str,
+                    'evidence_quality': data.get('evidence_quality', {}).get('quality', 'unknown')
+                })
+                
+            except Exception as e:
+                print(f"⚠️  Error reading {cache_file.name}: {e}")
+                continue
+        
+        return jsonify({'items': items, 'count': len(items), 'cache_dir': str(cache_dir)})
+        
+    except Exception as e:
+        print(f"✗ Cache list error: {e}")
+        return jsonify({'error': 'Failed to list cache', 'message': str(e)}), 500
+
+
+@app.route('/api/cache/<cache_key>', methods=['GET'])
+def get_cache_item(cache_key):
+    """Get specific cached assessment"""
+    try:
+        cache_file = config.CACHE_DIR / f"{cache_key}.json"
+        
+        if not cache_file.exists():
+            return jsonify({'error': 'Cache item not found', 'cache_key': cache_key}), 404
+        
+        with open(cache_file, 'r') as f:
+            data = json.load(f)
+        
+        return jsonify(data)
+        
+    except Exception as e:
+        print(f"✗ Cache get error: {e}")
+        return jsonify({'error': 'Failed to get cache item', 'message': str(e)}), 500
+
+
+@app.route('/api/cache', methods=['DELETE'])
+def clear_cache():
+    """Clear all cached assessments"""
+    try:
+        cache_dir = config.CACHE_DIR
+        
+        if not cache_dir.exists():
+            return jsonify({'deleted': 0, 'message': 'Cache directory does not exist'})
+        
+        cache_files = list(cache_dir.glob('*.json'))
+        deleted_count = 0
+        
+        for cache_file in cache_files:
+            try:
+                cache_file.unlink()
+                deleted_count += 1
+            except Exception as e:
+                print(f"⚠️  Error deleting {cache_file.name}: {e}")
+        
+        return jsonify({'deleted': deleted_count, 'message': f'Cleared {deleted_count} cached assessments'})
+        
+    except Exception as e:
+        print(f"✗ Cache clear error: {e}")
+        return jsonify({'error': 'Failed to clear cache', 'message': str(e)}), 500
+
+
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """Health check endpoint"""
+    try:
+        cache_dir = config.CACHE_DIR
+        cache_exists = cache_dir.exists()
+        cache_count = len(list(cache_dir.glob('*.json'))) if cache_exists else 0
+        
+        return jsonify({
+            'status': 'healthy',
+            'environment': config.FLASK_ENV,
+            'api_key_configured': bool(config.GEMINI_API_KEY),
+            'cache': {
+                'directory': str(cache_dir),
+                'exists': cache_exists,
+                'item_count': cache_count
+            },
+            'modules': {
+                'entity_resolver': 'loaded',
+                'taxonomy_classifier': 'loaded',
+                'alternative_suggester': 'loaded'
+            },
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
+
+
+@app.route('/api/config', methods=['GET'])
+def get_config():
+    """Get current configuration (non-sensitive)"""
+    return jsonify({
+        'environment': config.FLASK_ENV,
+        'debug': config.DEBUG,
+        'port': config.PORT,
+        'cache_dir': str(config.CACHE_DIR),
+        'cache_ttl_days': config.CACHE_TTL_DAYS,
+        'gemini_model': config.GEMINI_MODEL,
+        'log_level': config.LOG_LEVEL
+    })
+
+
+@app.route('/api/taxonomy', methods=['GET'])
+def get_taxonomy():
+    """Get available taxonomy categories"""
+    try:
+        return jsonify({
+            'categories': classifier.TAXONOMY_CATEGORIES,
+            'total_categories': len(classifier.TAXONOMY_CATEGORIES),
+            'total_subcategories': sum(len(v) for v in classifier.TAXONOMY_CATEGORIES.values())
+        })
+    except Exception as e:
+        return jsonify({'error': 'Failed to get taxonomy', 'message': str(e)}), 500
+
+
+# ============================================================================
+# ERROR HANDLERS
+# ============================================================================
+
+@app.errorhandler(404)
+def not_found(e):
+    """Handle 404 errors"""
+    return jsonify({
+        'error': 'Endpoint not found',
+        'available_endpoints': [
+            'POST /api/assess',
+            'POST /api/compare',
+            'GET /api/cache',
+            'GET /api/cache/<cache_key>',
+            'DELETE /api/cache',
+            'GET /api/health',
+            'GET /api/config',
+            'GET /api/taxonomy'
+        ]
+    }), 404
+
+
+@app.errorhandler(500)
+def internal_error(e):
+    """Handle 500 errors"""
+    return jsonify({'error': 'Internal server error', 'message': str(e)}), 500
+
+
+@app.after_request
+def after_request(response):
+    """Add CORS headers"""
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
+
+
+# ============================================================================
+# MAIN
+# ============================================================================
+
+def main():
+    """Main application entry point"""
+    
+    print("\n" + "="*70)
+    print("🔒 SECURITY ASSESSOR API")
+    print("="*70)
+    
+    port = config.PORT
+    debug = config.DEBUG
+    
+    print(f"\n{'='*70}")
+    print(f"🚀 Starting API Server")
+    print(f"{'='*70}")
+    print(f"📍 URL: http://localhost:{port}")
+    print(f"🔧 Debug Mode: {debug}")
+    print(f"📦 Environment: {config.FLASK_ENV}")
+    print(f"📂 Cache Dir: {config.CACHE_DIR}")
+    print(f"\nEndpoints:")
+    print(f"  POST   /api/assess        - Assess a product")
+    print(f"  POST   /api/compare       - Compare two products")
+    print(f"  GET    /api/cache         - List cached assessments")
+    print(f"  GET    /api/cache/<key>   - Get cached assessment")
+    print(f"  DELETE /api/cache         - Clear cache")
+    print(f"  GET    /api/health        - Health check")
+    print(f"  GET    /api/config        - Get configuration")
+    print(f"  GET    /api/taxonomy      - Get taxonomy categories")
+    print(f"\nPress CTRL+C to stop")
+    print(f"{'='*70}\n")
+    
+    app.run(debug=debug, host='0.0.0.0', port=port, threaded=True)
+
+
+if __name__ == '__main__':
+    main()
+
+
+
+
+
+
+
+
+
+security_assessor/React-UI-Frontend/web_ui.jsx
+
+import React, { useState } from 'react';
+import { Shield, Search, AlertTriangle, CheckCircle, XCircle, FileText, Clock, Database, TrendingUp, GitCompare, RefreshCw, Trash2 } from 'lucide-react';
+
+const SecurityAssessorUI = () => {
+  const [activeTab, setActiveTab] = useState('assess');
+  const [target, setTarget] = useState('');
+  const [compareTarget1, setCompareTarget1] = useState('');
+  const [compareTarget2, setCompareTarget2] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [assessment, setAssessment] = useState(null);
+  const [comparison, setComparison] = useState(null);
+  const [error, setError] = useState(null);
+  const [cacheList, setCacheList] = useState([]);
+
+  // Simulate API call (replace with actual backend)
+  const mockAssess = async (target) => {
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    return {
+      resolution: {
+        product_name: target,
+        vendor_name: "Example Corp",
+        vendor_website: "https://example.com",
+        confidence: 0.85
+      },
+      classification: {
+        primary_category: "Communication & Collaboration",
+        primary_subcategory: "Team Chat/Messaging",
+        deployment_model: "SaaS",
+        data_access_level: "high",
+        confidence: 0.9,
+        key_functions: ["Messaging", "File Sharing", "Video Calls"],
+        evidence_basis: "mixed"
+      },
+      evidence_quality: {
+        quality: "good",
+        sources_found: 4,
+        sources_attempted: 6,
+        independent_sources: 2,
+        vendor_sources: 2
+      },
+      sources: {
+        security_page: { found: true, source_label: "vendor-stated" },
+        terms_of_service: { found: true, source_label: "vendor-stated" },
+        cisa_kev: { found: true, total_matches: 2, source_label: "independent" }
+      },
+      alternatives: {
+        alternatives: [
+          {
+            product_name: "Alternative A",
+            vendor_name: "Secure Vendor",
+            confidence: 0.8,
+            why_safer: "Better security track record with SOC 2 Type II",
+            security_highlights: ["SOC 2 Type II", "Zero CISA KEV", "Open source"],
+            trade_offs: ["Smaller user base", "Less integrations"]
+          }
+        ],
+        recommendation_confidence: 0.75
+      },
+      resolved_at: new Date().toISOString()
+    };
+  };
+
+  const handleAssess = async () => {
+    if (!target.trim()) return;
+    
+    setLoading(true);
+    setError(null);
+    setAssessment(null);
+    
+    try {
+      const result = await mockAssess(target);
+      setAssessment(result);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCompare = async () => {
+    if (!compareTarget1.trim() || !compareTarget2.trim()) return;
+    
+    setLoading(true);
+    setError(null);
+    setComparison(null);
+    
+    try {
+      const [result1, result2] = await Promise.all([
+        mockAssess(compareTarget1),
+        mockAssess(compareTarget2)
+      ]);
+      setComparison({ product1: result1, product2: result2 });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const RiskBadge = ({ level }) => {
+    const colors = {
+      high: 'bg-red-100 text-red-800 border-red-300',
+      medium: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+      low: 'bg-green-100 text-green-800 border-green-300',
+      unknown: 'bg-gray-100 text-gray-800 border-gray-300'
+    };
+    
+    return (
+      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${colors[level] || colors.unknown}`}>
+        {level.toUpperCase()}
+      </span>
+    );
+  };
+
+  const EvidenceBadge = ({ basis }) => {
+    const colors = {
+      independent: 'bg-blue-100 text-blue-800',
+      'vendor-stated': 'bg-purple-100 text-purple-800',
+      mixed: 'bg-indigo-100 text-indigo-800',
+      insufficient: 'bg-gray-100 text-gray-800'
+    };
+    
+    return (
+      <span className={`px-2 py-1 rounded text-xs font-medium ${colors[basis] || colors.insufficient}`}>
+        {basis.replace('-', ' ').toUpperCase()}
+      </span>
+    );
+  };
+
+  const AssessmentView = () => {
+    if (!assessment) return null;
+
+    const { resolution, classification, evidence_quality, sources, alternatives } = assessment;
+    const cisaKev = sources.cisa_kev?.total_matches || 0;
+
+    return (
+      <div className="space-y-6">
+        {/* Entity Info */}
+        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">{resolution.product_name}</h2>
+              <p className="text-gray-600 mt-1">by {resolution.vendor_name}</p>
+            </div>
+            <div className="text-right">
+              <div className="text-sm text-gray-500 mb-1">Resolution Confidence</div>
+              <div className="text-2xl font-bold text-blue-600">{(resolution.confidence * 100).toFixed(0)}%</div>
+            </div>
+          </div>
+          
+          <a href={resolution.vendor_website} target="_blank" rel="noopener noreferrer" 
+             className="text-blue-600 hover:underline text-sm">
+            {resolution.vendor_website}
+          </a>
+        </div>
+
+        {/* Risk Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-gray-500">CISA KEV Status</div>
+                <div className="text-2xl font-bold mt-1">
+                  {cisaKev === 0 ? (
+                    <span className="text-green-600">✓ Clean</span>
+                  ) : (
+                    <span className="text-red-600">{cisaKev} Found</span>
+                  )}
+                </div>
+              </div>
+              {cisaKev > 0 ? (
+                <AlertTriangle className="text-red-500" size={32} />
+              ) : (
+                <CheckCircle className="text-green-500" size={32} />
+              )}
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-gray-500">Evidence Quality</div>
+                <div className="text-2xl font-bold mt-1 capitalize">{evidence_quality.quality}</div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {evidence_quality.sources_found}/{evidence_quality.sources_attempted} sources
+                </div>
+              </div>
+              <Database className="text-blue-500" size={32} />
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-gray-500">Independent Sources</div>
+                <div className="text-2xl font-bold mt-1">{evidence_quality.independent_sources}</div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {evidence_quality.vendor_sources} vendor-stated
+                </div>
+              </div>
+              <FileText className="text-purple-500" size={32} />
+            </div>
+          </div>
+        </div>
+
+        {/* Classification */}
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h3 className="text-lg font-semibold mb-4 flex items-center">
+            <TrendingUp className="mr-2" size={20} />
+            Software Taxonomy
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm text-gray-500">Primary Category</div>
+              <div className="font-medium mt-1">{classification.primary_category}</div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-500">Subcategory</div>
+              <div className="font-medium mt-1">{classification.primary_subcategory}</div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-500">Deployment Model</div>
+              <div className="font-medium mt-1">{classification.deployment_model}</div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-500">Data Access Level</div>
+              <div className="font-medium mt-1">
+                <RiskBadge level={classification.data_access_level} />
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <div className="text-sm text-gray-500 mb-2">Key Functions</div>
+            <div className="flex flex-wrap gap-2">
+              {classification.key_functions.map((func, i) => (
+                <span key={i} className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
+                  {func}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center justify-between">
+            <div>
+              <span className="text-sm text-gray-500 mr-2">Evidence Basis:</span>
+              <EvidenceBadge basis={classification.evidence_basis} />
+            </div>
+            <div className="text-sm text-gray-500">
+              Confidence: {(classification.confidence * 100).toFixed(0)}%
+            </div>
+          </div>
+        </div>
+
+        {/* Sources */}
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h3 className="text-lg font-semibold mb-4">High-Signal Sources</h3>
+          
+          <div className="space-y-3">
+            {Object.entries(sources).map(([key, data]) => (
+              <div key={key} className="flex items-start justify-between py-2 border-b border-gray-100 last:border-0">
+                <div className="flex items-center">
+                  {data.found ? (
+                    <CheckCircle className="text-green-500 mr-2 flex-shrink-0" size={18} />
+                  ) : (
+                    <XCircle className="text-gray-400 mr-2 flex-shrink-0" size={18} />
+                  )}
+                  <div>
+                    <div className="font-medium text-sm capitalize">
+                      {key.replace(/_/g, ' ')}
+                    </div>
+                    {data.found && data.url && (
+                      <a href={data.url} target="_blank" rel="noopener noreferrer"
+                         className="text-xs text-blue-600 hover:underline">
+                        {data.url.substring(0, 50)}...
+                      </a>
+                    )}
+                  </div>
+                </div>
+                <div className="ml-4 flex-shrink-0">
+                  {data.found && (
+                    <EvidenceBadge basis={data.source_label} />
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Alternatives */}
+        {alternatives.alternatives && alternatives.alternatives.length > 0 && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
+            <h3 className="text-lg font-semibold mb-4 flex items-center">
+              <Shield className="mr-2" size={20} />
+              Safer Alternatives
+            </h3>
+
+            <div className="bg-white rounded-lg p-4 mb-4">
+              <div className="text-sm text-gray-600 mb-2">Recommendation Confidence</div>
+              <div className="text-xl font-bold text-blue-600">
+                {(alternatives.recommendation_confidence * 100).toFixed(0)}%
+              </div>
+            </div>
+
+            {alternatives.alternatives.map((alt, i) => (
+              <div key={i} className="bg-white rounded-lg p-5 mb-4 last:mb-0 shadow-sm">
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <h4 className="font-bold text-lg">{alt.product_name}</h4>
+                    <p className="text-gray-600 text-sm">by {alt.vendor_name}</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-gray-500">Confidence</div>
+                    <div className="text-lg font-bold text-green-600">
+                      {(alt.confidence * 100).toFixed(0)}%
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mb-3">
+                  <div className="text-sm font-medium text-gray-700 mb-1">Why Safer</div>
+                  <p className="text-sm text-gray-600">{alt.why_safer}</p>
+                </div>
+
+                <div className="mb-3">
+                  <div className="text-sm font-medium text-gray-700 mb-2">Security Highlights</div>
+                  <div className="flex flex-wrap gap-2">
+                    {alt.security_highlights.map((highlight, j) => (
+                      <span key={j} className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
+                        ✓ {highlight}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-sm font-medium text-gray-700 mb-2">Trade-offs</div>
+                  <div className="flex flex-wrap gap-2">
+                    {alt.trade_offs.map((tradeoff, j) => (
+                      <span key={j} className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs">
+                        ⚠ {tradeoff}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Timestamp */}
+        <div className="text-center text-sm text-gray-500 flex items-center justify-center">
+          <Clock size={14} className="mr-1" />
+          Assessed: {new Date(assessment.resolved_at).toLocaleString()}
+        </div>
+      </div>
+    );
+  };
+
+  const ComparisonView = () => {
+    if (!comparison) return null;
+
+    const { product1, product2 } = comparison;
+    
+    const CompareRow = ({ label, value1, value2, highlight }) => (
+      <div className="grid grid-cols-3 gap-4 py-3 border-b border-gray-100">
+        <div className="font-medium text-gray-700">{label}</div>
+        <div className={`text-center ${highlight === 'left' ? 'bg-green-50 font-medium' : ''}`}>
+          {value1}
+        </div>
+        <div className={`text-center ${highlight === 'right' ? 'bg-green-50 font-medium' : ''}`}>
+          {value2}
+        </div>
+      </div>
+    );
+
+    const kev1 = product1.sources.cisa_kev?.total_matches || 0;
+    const kev2 = product2.sources.cisa_kev?.total_matches || 0;
+    
+    return (
+      <div className="space-y-6">
+        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+          <h2 className="text-xl font-bold mb-6 flex items-center">
+            <GitCompare className="mr-2" />
+            Security Comparison Matrix
+          </h2>
+
+          <div className="grid grid-cols-3 gap-4 mb-2 pb-3 border-b-2 border-gray-300">
+            <div className="font-bold text-gray-500">Dimension</div>
+            <div className="font-bold text-center text-blue-600">{product1.resolution.product_name}</div>
+            <div className="font-bold text-center text-indigo-600">{product2.resolution.product_name}</div>
+          </div>
+
+          <CompareRow 
+            label="Vendor"
+            value1={product1.resolution.vendor_name}
+            value2={product2.resolution.vendor_name}
+          />
+
+          <CompareRow 
+            label="Category"
+            value1={product1.classification.primary_subcategory}
+            value2={product2.classification.primary_subcategory}
+          />
+
+          <CompareRow 
+            label="Deployment"
+            value1={product1.classification.deployment_model}
+            value2={product2.classification.deployment_model}
+          />
+
+          <CompareRow 
+            label="CISA KEV"
+            value1={kev1 === 0 ? '✓ Clean' : `⚠ ${kev1} entries`}
+            value2={kev2 === 0 ? '✓ Clean' : `⚠ ${kev2} entries`}
+            highlight={kev1 < kev2 ? 'left' : kev2 < kev1 ? 'right' : null}
+          />
+
+          <CompareRow 
+            label="Evidence Quality"
+            value1={product1.evidence_quality.quality}
+            value2={product2.evidence_quality.quality}
+          />
+
+          <CompareRow 
+            label="Independent Sources"
+            value1={product1.evidence_quality.independent_sources}
+            value2={product2.evidence_quality.independent_sources}
+            highlight={product1.evidence_quality.independent_sources > product2.evidence_quality.independent_sources ? 'left' : 
+                      product2.evidence_quality.independent_sources > product1.evidence_quality.independent_sources ? 'right' : null}
+          />
+
+          <CompareRow 
+            label="Data Access Level"
+            value1={product1.classification.data_access_level}
+            value2={product2.classification.data_access_level}
+          />
+        </div>
+
+        {/* Recommendation */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+          <h3 className="font-semibold mb-2">Recommendation</h3>
+          <p className="text-gray-700">
+            {kev1 < kev2 ? (
+              <>✓ <strong>{product1.resolution.product_name}</strong> appears safer with fewer CISA KEV entries</>
+            ) : kev2 < kev1 ? (
+              <>✓ <strong>{product2.resolution.product_name}</strong> appears safer with fewer CISA KEV entries</>
+            ) : (
+              <>Both products show similar risk profiles. Consider evidence quality and specific requirements.</>
+            )}
+          </p>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Shield size={36} className="mr-3" />
+              <div>
+                <h1 className="text-3xl font-bold">Security Assessor</h1>
+                <p className="text-blue-100 text-sm">CISO-Ready Trust Briefs in Minutes</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex space-x-8">
+            <button
+              onClick={() => setActiveTab('assess')}
+              className={`py-4 border-b-2 font-medium transition-colors ${
+                activeTab === 'assess'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Search className="inline mr-2" size={18} />
+              Assess Product
+            </button>
+            <button
+              onClick={() => setActiveTab('compare')}
+              className={`py-4 border-b-2 font-medium transition-colors ${
+                activeTab === 'compare'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <GitCompare className="inline mr-2" size={18} />
+              Compare Products
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {activeTab === 'assess' && (
+          <div>
+            {/* Search Box */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+              <div className="flex gap-4">
+                <input
+                  type="text"
+                  value={target}
+                  onChange={(e) => setTarget(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleAssess()}
+                  placeholder="Enter product name, vendor, or URL (e.g., Slack, github.com)"
+                  className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={handleAssess}
+                  disabled={loading}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center"
+                >
+                  {loading ? (
+                    <>
+                      <RefreshCw className="animate-spin mr-2" size={18} />
+                      Assessing...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="mr-2" size={18} />
+                      Assess
+                    </>
+                  )}
+                </button>
+              </div>
+              <p className="text-sm text-gray-500 mt-2">
+                Try: "Slack", "Zoom", "https://github.com", "Model Context Protocol"
+              </p>
+            </div>
+
+            {/* Error */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-8">
+                <div className="flex items-center">
+                  <AlertTriangle className="text-red-600 mr-2" size={20} />
+                  <span className="text-red-800 font-medium">Error: {error}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Results */}
+            <AssessmentView />
+          </div>
+        )}
+
+        {activeTab === 'compare' && (
+          <div>
+            {/* Compare Inputs */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <input
+                  type="text"
+                  value={compareTarget1}
+                  onChange={(e) => setCompareTarget1(e.target.value)}
+                  placeholder="First product (e.g., Zoom)"
+                  className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <input
+                  type="text"
+                  value={compareTarget2}
+                  onChange={(e) => setCompareTarget2(e.target.value)}
+                  placeholder="Second product (e.g., Microsoft Teams)"
+                  className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <button
+                onClick={handleCompare}
+                disabled={loading}
+                className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
+              >
+                {loading ? (
+                  <>
+                    <RefreshCw className="animate-spin mr-2" size={18} />
+                    Comparing...
+                  </>
+                ) : (
+                  <>
+                    <GitCompare className="mr-2" size={18} />
+                    Compare Products
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Error */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-8">
+                <div className="flex items-center">
+                  <AlertTriangle className="text-red-600 mr-2" size={20} />
+                  <span className="text-red-800 font-medium">Error: {error}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Comparison Results */}
+            <ComparisonView />
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="bg-gray-800 text-gray-400 mt-16">
+        <div className="max-w-7xl mx-auto px-4 py-6 text-center text-sm">
+          <p>Security Assessor - Evidence-based trust briefs with transparent sourcing</p>
+          <p className="mt-1">Cache persists locally • All sources labeled vendor-stated vs independent</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default SecurityAssessorUI;

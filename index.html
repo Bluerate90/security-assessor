@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Assessor - CISO Trust Briefs</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .loading-spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .fade-in {
+            animation: fadeIn 0.5s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 py-6">
+            <div class="flex items-center">
+                <svg class="w-10 h-10 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                </svg>
+                <div>
+                    <h1 class="text-3xl font-bold">Security Assessor</h1>
+                    <p class="text-blue-100 text-sm">CISO-Ready Trust Briefs in Minutes</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Tabs -->
+    <div class="bg-white border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex space-x-8">
+                <button onclick="switchTab('assess')" id="tab-assess" class="tab-button py-4 border-b-2 border-blue-600 text-blue-600 font-medium">
+                    Assess Product
+                </button>
+                <button onclick="switchTab('compare')" id="tab-compare" class="tab-button py-4 border-b-2 border-transparent text-gray-600 hover:text-gray-900 font-medium">
+                    Compare Products
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Assess Tab -->
+        <div id="assess-tab" class="tab-content">
+            <!-- Search Box -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+                <div class="flex gap-4">
+                    <input 
+                        type="text" 
+                        id="assess-input" 
+                        placeholder="Enter product name, vendor, or URL (e.g., Slack, github.com)"
+                        class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        onkeypress="if(event.key==='Enter') assessProduct()"
+                    />
+                    <button 
+                        onclick="assessProduct()" 
+                        id="assess-button"
+                        class="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center"
+                    >
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        Assess
+                    </button>
+                </div>
+                <p class="text-sm text-gray-500 mt-2">
+                    Try: "Slack", "Zoom", "https://github.com", "Model Context Protocol"
+                </p>
+            </div>
+
+            <!-- Loading -->
+            <div id="assess-loading" class="hidden text-center py-12">
+                <div class="loading-spinner mx-auto mb-4"></div>
+                <p class="text-gray-600">Analyzing security posture...</p>
+                <p class="text-sm text-gray-500 mt-2">This may take 15-30 seconds</p>
+            </div>
+
+            <!-- Error -->
+            <div id="assess-error" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 mb-8">
+                <div class="flex items-center">
+                    <svg class="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span id="assess-error-text" class="text-red-800 font-medium"></span>
+                </div>
+            </div>
+
+            <!-- Results -->
+            <div id="assess-results" class="hidden fade-in"></div>
+        </div>
+
+        <!-- Compare Tab -->
+        <div id="compare-tab" class="tab-content hidden">
+            <!-- Compare Inputs -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <input 
+                        type="text" 
+                        id="compare-input1" 
+                        placeholder="First product (e.g., Zoom)"
+                        class="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <input 
+                        type="text" 
+                        id="compare-input2" 
+                        placeholder="Second product (e.g., Microsoft Teams)"
+                        class="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                </div>
+                <button 
+                    onclick="compareProducts()" 
+                    id="compare-button"
+                    class="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    Compare Products
+                </button>
+            </div>
+
+            <!-- Compare Loading -->
+            <div id="compare-loading" class="hidden text-center py-12">
+                <div class="loading-spinner mx-auto mb-4"></div>
+                <p class="text-gray-600">Comparing security postures...</p>
+                <p class="text-sm text-gray-500 mt-2">This may take 30-60 seconds</p>
+            </div>
+
+            <!-- Compare Error -->
+            <div id="compare-error" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 mb-8">
+                <div class="flex items-center">
+                    <svg class="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span id="compare-error-text" class="text-red-800 font-medium"></span>
+                </div>
+            </div>
+
+            <!-- Compare Results -->
+            <div id="compare-results" class="hidden fade-in"></div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-gray-400 mt-16">
+        <div class="max-w-7xl mx-auto px-4 py-6 text-center text-sm">
+            <p>Security Assessor - Evidence-based trust briefs with transparent sourcing</p>
+            <p class="mt-1">Cache persists locally • All sources labeled vendor-stated vs independent</p>
+        </div>
+    </footer>
+
+    <script>
+        const API_BASE = 'http://localhost:5000';
+
+        // Tab switching
+        function switchTab(tab) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-button').forEach(el => {
+                el.classList.remove('border-blue-600', 'text-blue-600');
+                el.classList.add('border-transparent', 'text-gray-600');
+            });
+
+            // Show selected tab
+            document.getElementById(`${tab}-tab`).classList.remove('hidden');
+            document.getElementById(`tab-${tab}`).classList.add('border-blue-600', 'text-blue-600');
+            document.getElementById(`tab-${tab}`).classList.remove('border-transparent', 'text-gray-600');
+        }
+
+        // Assess product
+        async function assessProduct() {
+            const input = document.getElementById('assess-input').value.trim();
+            if (!input) return;
+
+            const button = document.getElementById('assess-button');
+            const loading = document.getElementById('assess-loading');
+            const error = document.getElementById('assess-error');
+            const results = document.getElementById('assess-results');
+
+            // Show loading
+            button.disabled = true;
+            loading.classList.remove('hidden');
+            error.classList.add('hidden');
+            results.classList.add('hidden');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/assess`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ target: input, force_refresh: false })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Assessment failed');
+                }
+
+                const data = await response.json();
+                displayAssessment(data);
+
+            } catch (err) {
+                document.getElementById('assess-error-text').textContent = err.message;
+                error.classList.remove('hidden');
+            } finally {
+                button.disabled = false;
+                loading.classList.add('hidden');
+            }
+        }
+
+        // Display assessment results
+        function displayAssessment(data) {
+            const results = document.getElementById('assess-results');
+            const resolution = data.resolution;
+            const classification = data.classification || {};
+            const evidence = data.evidence_quality || {};
+            const sources = data.sources || {};
+            const alternatives = data.alternatives || {};
+            
+            const cisaKev = sources.cisa_kev?.total_matches || 0;
+
+            results.innerHTML = `
+                <!-- Entity Info -->
+                <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm mb-6">
+                    <div class="flex items-start justify-between mb-4">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-900">${resolution.product_name}</h2>
+                            <p class="text-gray-600 mt-1">by ${resolution.vendor_name}</p>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm text-gray-500 mb-1">Resolution Confidence</div>
+                            <div class="text-2xl font-bold text-blue-600">${Math.round(resolution.confidence * 100)}%</div>
+                        </div>
+                    </div>
+                    ${resolution.vendor_website ? `
+                        <a href="${resolution.vendor_website}" target="_blank" class="text-blue-600 hover:underline text-sm">
+                            ${resolution.vendor_website}
+                        </a>
+                    ` : ''}
+                </div>
+
+                <!-- Risk Overview -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-white border border-gray-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm text-gray-500">CISA KEV Status</div>
+                                <div class="text-2xl font-bold mt-1">
+                                    ${cisaKev === 0 ? 
+                                        '<span class="text-green-600">✓ Clean</span>' : 
+                                        `<span class="text-red-600">${cisaKev} Found</span>`
+                                    }
+                                </div>
+                            </div>
+                            ${cisaKev > 0 ? 
+                                '<svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>' :
+                                '<svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
+                            }
+                        </div>
+                    </div>
+
+                    <div class="bg-white border border-gray-200 rounded-lg p-4">
+                        <div class="text-sm text-gray-500">Evidence Quality</div>
+                        <div class="text-2xl font-bold mt-1 capitalize">${evidence.quality || 'unknown'}</div>
+                        <div class="text-xs text-gray-500 mt-1">
+                            ${evidence.sources_found || 0}/${evidence.sources_attempted || 0} sources
+                        </div>
+                    </div>
+
+                    <div class="bg-white border border-gray-200 rounded-lg p-4">
+                        <div class="text-sm text-gray-500">Independent Sources</div>
+                        <div class="text-2xl font-bold mt-1">${evidence.independent_sources || 0}</div>
+                        <div class="text-xs text-gray-500 mt-1">
+                            ${evidence.vendor_sources || 0} vendor-stated
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Classification -->
+                ${classification.primary_category ? `
+                    <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                            </svg>
+                            Software Taxonomy
+                        </h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <div class="text-sm text-gray-500">Primary Category</div>
+                                <div class="font-medium mt-1">${classification.primary_category}</div>
+                            </div>
+                            <div>
+                                <div class="text-sm text-gray-500">Subcategory</div>
+                                <div class="font-medium mt-1">${classification.primary_subcategory}</div>
+                            </div>
+                            <div>
+                                <div class="text-sm text-gray-500">Deployment Model</div>
+                                <div class="font-medium mt-1">${classification.deployment_model || 'Unknown'}</div>
+                            </div>
+                            <div>
+                                <div class="text-sm text-gray-500">Data Access Level</div>
+                                <div class="font-medium mt-1">
+                                    <span class="px-2 py-1 rounded-full text-xs font-medium ${
+                                        classification.data_access_level === 'high' ? 'bg-red-100 text-red-800' :
+                                        classification.data_access_level === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                        'bg-green-100 text-green-800'
+                                    }">${classification.data_access_level?.toUpperCase() || 'UNKNOWN'}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        ${classification.key_functions?.length ? `
+                            <div class="mt-4">
+                                <div class="text-sm text-gray-500 mb-2">Key Functions</div>
+                                <div class="flex flex-wrap gap-2">
+                                    ${classification.key_functions.map(func => 
+                                        `<span class="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">${func}</span>`
+                                    ).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        <div class="mt-4 flex items-center justify-between">
+                            <div>
+                                <span class="text-sm text-gray-500 mr-2">Evidence Basis:</span>
+                                <span class="px-2 py-1 rounded text-xs font-medium ${
+                                    classification.evidence_basis === 'independent' ? 'bg-blue-100 text-blue-800' :
+                                    classification.evidence_basis === 'mixed' ? 'bg-indigo-100 text-indigo-800' :
+                                    classification.evidence_basis === 'vendor-stated' ? 'bg-purple-100 text-purple-800' :
+                                    'bg-gray-100 text-gray-800'
+                                }">${classification.evidence_basis?.toUpperCase() || 'UNKNOWN'}</span>
+                            </div>
+                            <div class="text-sm text-gray-500">
+                                Confidence: ${Math.round((classification.confidence || 0) * 100)}%
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+
+                <!-- Alternatives -->
+                ${alternatives.alternatives?.length ? `
+                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                            </svg>
+                            Safer Alternatives
+                        </h3>
+
+                        <div class="bg-white rounded-lg p-4 mb-4">
+                            <div class="text-sm text-gray-600 mb-2">Recommendation Confidence</div>
+                            <div class="text-xl font-bold text-blue-600">
+                                ${Math.round((alternatives.recommendation_confidence || 0) * 100)}%
+                            </div>
+                        </div>
+
+                        ${alternatives.alternatives.map((alt, i) => `
+                            <div class="bg-white rounded-lg p-5 mb-4 shadow-sm">
+                                <div class="flex items-start justify-between mb-3">
+                                    <div>
+                                        <h4 class="font-bold text-lg">${alt.product_name}</h4>
+                                        <p class="text-gray-600 text-sm">by ${alt.vendor_name}</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-xs text-gray-500">Confidence</div>
+                                        <div class="text-lg font-bold text-green-600">
+                                            ${Math.round((alt.confidence || 0) * 100)}%
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="text-sm font-medium text-gray-700 mb-1">Why Safer</div>
+                                    <p class="text-sm text-gray-600">${alt.why_safer}</p>
+                                </div>
+
+                                ${alt.security_highlights?.length ? `
+                                    <div class="mb-3">
+                                        <div class="text-sm font-medium text-gray-700 mb-2">Security Highlights</div>
+                                        <div class="flex flex-wrap gap-2">
+                                            ${alt.security_highlights.map(h => 
+                                                `<span class="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">✓ ${h}</span>`
+                                            ).join('')}
+                                        </div>
+                                    </div>
+                                ` : ''}
+
+                                ${alt.trade_offs?.length ? `
+                                    <div>
+                                        <div class="text-sm font-medium text-gray-700 mb-2">Trade-offs</div>
+                                        <div class="flex flex-wrap gap-2">
+                                            ${alt.trade_offs.map(t => 
+                                                `<span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs">⚠ ${t}</span>`
+                                            ).join('')}
+                                        </div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+
+                <!-- Timestamp -->
+                <div class="text-center text-sm text-gray-500 mt-6 flex items-center justify-center">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Assessed: ${new Date(data.resolved_at).toLocaleString()}
+                </div>
+            `;
+
+            results.classList.remove('hidden');
+        }
+
+        // Compare products
+        async function compareProducts() {
+            const input1 = document.getElementById('compare-input1').value.trim();
+            const input2 = document.getElementById('compare-input2').value.trim();
+            
+            if (!input1 || !input2) {
+                alert('Please enter both products to compare');
+                return;
+            }
+
+            const button = document.getElementById('compare-button');
+            const loading = document.getElementById('compare-loading');
+            const error = document.getElementById('compare-error');
+            const results = document.getElementById('compare-results');
+
+            button.disabled = true;
+            loading.classList.remove('hidden');
+            error.classList.add('hidden');
+            results.classList.add('hidden');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/compare`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ target1: input1, target2: input2 })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Comparison failed');
+                }
+
+                const data = await response.json();
+                displayComparison(data);
+
+            } catch (err) {
+                document.getElementById('compare-error-text').textContent = err.message;
+                error.classList.remove('hidden');
+            } finally {
+                button.disabled = false;
+                loading.classList.add('hidden');
+            }
+        }
+
+        // Display comparison
+        function displayComparison(data) {
+            const results = document.getElementById('compare-results');
+            const p1 = data.product1;
+            const p2 = data.product2;
+            
+            const kev1 = p1.sources.cisa_kev?.total_matches || 0;
+            const kev2 = p2.sources.cisa_kev?.total_matches || 0;
+
+            results.innerHTML = `
+                <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                    <h2 class="text-xl font-bold mb-6 flex items-center">
+                        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                        Security Comparison Matrix
+                    </h2>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b-2 border-gray-300">
+                                    <th class="text-left py-3 px-4 font-bold text-gray-500">Dimension</th>
+                                    <th class="text-center py-3 px-4 font-bold text-blue-600">${p1.resolution.product_name}</th>
+                                    <th class="text-center py-3 px-4 font-bold text-indigo-600">${p2.resolution.product_name}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                <tr>
+                                    <td class="py-3 px-4 font-medium text-gray-700">Vendor</td>
+                                    <td class="py-3 px-4 text-center">${p1.resolution.vendor_name}</td>
+                                    <td class="py-3 px-4 text-center">${p2.resolution.vendor_name}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-4 font-medium text-gray-700">Category</td>
+                                    <td class="py-3 px-4 text-center">${p1.classification?.primary_subcategory || 'Unknown'}</td>
+                                    <td class="py-3 px-4 text-center">${p2.classification?.primary_subcategory || 'Unknown'}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-4 font-medium text-gray-700">Deployment</td>
+                                    <td class="py-3 px-4 text-center">${p1.classification?.deployment_model || 'Unknown'}</td>
+                                    <td class="py-3 px-4 text-center">${p2.classification?.deployment_model || 'Unknown'}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-4 font-medium text-gray-700">CISA KEV</td>
+                                    <td class="py-3 px-4 text-center ${kev1 < kev2 ? 'bg-green-50 font-medium' : ''}">
+                                        ${kev1 === 0 ? '✓ Clean' : `⚠️ ${kev1} entries`}
+                                    </td>
+                                    <td class="py-3 px-4 text-center ${kev2 < kev1 ? 'bg-green-50 font-medium' : ''}">
+                                        ${kev2 === 0 ? '✓ Clean' : `⚠️ ${kev2} entries`}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-4 font-medium text-gray-700">Evidence Quality</td>
+                                    <td class="py-3 px-4 text-center capitalize">${p1.evidence_quality?.quality || 'unknown'}</td>
+                                    <td class="py-3 px-4 text-center capitalize">${p2.evidence_quality?.quality || 'unknown'}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-4 font-medium text-gray-700">Independent Sources</td>
+                                    <td class="py-3 px-4 text-center ${(p1.evidence_quality?.independent_sources || 0) > (p2.evidence_quality?.independent_sources || 0) ? 'bg-green-50 font-medium' : ''}">
+                                        ${p1.evidence_quality?.independent_sources || 0}
+                                    </td>
+                                    <td class="py-3 px-4 text-center ${(p2.evidence_quality?.independent_sources || 0) > (p1.evidence_quality?.independent_sources || 0) ? 'bg-green-50 font-medium' : ''}">
+                                        ${p2.evidence_quality?.independent_sources || 0}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-4 font-medium text-gray-700">Data Access Level</td>
+                                    <td class="py-3 px-4 text-center capitalize">${p1.classification?.data_access_level || 'unknown'}</td>
+                                    <td class="py-3 px-4 text-center capitalize">${p2.classification?.data_access_level || 'unknown'}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Recommendation -->
+                    <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h3 class="font-semibold mb-2">Recommendation</h3>
+                        <p class="text-gray-700">
+                            ${kev1 < kev2 ? 
+                                `✓ <strong>${p1.resolution.product_name}</strong> appears safer with fewer CISA KEV entries` :
+                              kev2 < kev1 ?
+                                `✓ <strong>${p2.resolution.product_name}</strong> appears safer with fewer CISA KEV entries` :
+                                'Both products show similar risk profiles. Consider evidence quality and specific requirements.'
+                            }
+                        </p>
+                    </div>
+                </div>
+            `;
+
+            results.classList.remove('hidden');
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Security Assessor UI loaded');
+            switchTab('assess');
+        });
+    </script>
+</body>
+</html>

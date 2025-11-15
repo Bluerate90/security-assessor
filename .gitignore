@@ -1,0 +1,39 @@
+# ---- Python ----
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# Virtual environment
+venv/
+env/
+
+# Environment variable files
+.env
+*.env
+Configuration/.env
+
+# Pip
+pip-wheel-metadata/
+*.egg-info/
+
+# ---- Cache ----
+Runtime/assessor_cache/
+
+# ---- System files ----
+.DS_Store
+Thumbs.db
+
+# ---- IDE / Editor ----
+.vscode/
+.idea/
+
+# ---- Docker ----
+.dockerignore
+
+# ---- Cloud ----
+.gcloudignore
+
+# ---- Other ----
+logs/
