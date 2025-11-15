@@ -29,11 +29,5 @@ Thumbs.db
 .vscode/
 .idea/
 
-# ---- Docker ----
-.dockerignore
-
-# ---- Cloud ----
-.gcloudignore
-
 # ---- Other ----
 logs/

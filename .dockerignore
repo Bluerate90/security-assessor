@@ -1,0 +1,11 @@
+.git
+.gitignore
+__pycache__/
+*.pyc
+.env
+venv/
+env/
+.DS_Store
+README.md
+Documentation/README.md
+Runtime/assessor_cache/
