@@ -112,6 +112,374 @@ Confidence:        95%
 💡 TOP ALTERNATIVE:
   Microsoft Teams (92% confidence)
   Why: Enterprise-grade security, native M365 integration
+
+
+
+
+📋 API Request: Assess 'slack' (refresh=False)
+
+============================================================
+🔎 Resolving: slack
+============================================================
+
+📋 Step 1: Identifying product and vendor...
+  Product: Slack
+  Vendor: Slack Technologies (Salesforce)
+  Confidence: 100.0%
+
+📡 Step 2: Fetching high-signal sources...
+
+  🔍 Searching for high-signal sources...
+    Trying security_page: https://slack.com/security
+      ✓ Found security_page
+    Trying terms_of_service: https://slack.com/terms
+      ✓ Found terms_of_service
+    Trying privacy_policy: https://slack.com/privacy
+      ✓ Found privacy_policy
+    Trying psirt_page: https://slack.com/psirt
+    ✗ Error fetching https://slack.com/psirt: 404 Client Error: Not Found for url: https://slack.com/psirt
+    Trying psirt_page: https://slack.com/security/advisories
+    ✗ Error fetching https://slack.com/security/advisories: 404 Client Error: Not Found for url: https://slack.com/security/advisories
+    Checking CISA KEV catalog...
+      ✓ No CISA KEV entries (good sign)
+  ✓ Cached to 877c3aec832cd410.json
+
+============================================================
+✓ Resolution complete
+============================================================
+
+
+📊 Adding taxonomy classification...
+
+============================================================
+🏷️  Classifying Software Taxonomy
+============================================================
+  🤖 Analyzing Slack with Gemini...
+
+  ✓ Classification complete:
+    Primary: Communication & Collaboration → Team Chat/Messaging
+    Confidence: 70.0%
+    Evidence Basis: vendor-stated
+    Deployment: SaaS
+    Data Access: high
+    Secondary: 2 additional categories
+
+🎯 Generating alternatives recommendations...
+
+============================================================
+🔄 Finding Safer Alternatives
+============================================================
+  🤖 Searching for alternatives with better security posture...
+
+  ✓ Found 2 alternative(s)
+    Confidence: 80.0%
+    1. Microsoft Teams by Microsoft Corporation
+       Confidence: 85.0%
+    2. Mattermost by Mattermost, Inc.
+       Confidence: 75.0%
+
+  ✓ Complete assessment cached
+✓ Assessment complete for 'slack'
+127.0.0.1 - - [15/Nov/2025 16:00:39] "POST /api/assess HTTP/1.1" 200 -
+127.0.0.1 - - [15/Nov/2025 16:01:19] "OPTIONS /api/compare HTTP/1.1" 200 -
+
+⚖️  API Request: Compare 'zoom' vs 'Microsoft Teams'
+
+============================================================
+🔎 Resolving: zoom
+============================================================
+
+📋 Step 1: Identifying product and vendor...
+  Product: Zoom
+  Vendor: Zoom Video Communications, Inc.
+  Confidence: 95.0%
+
+📡 Step 2: Fetching high-signal sources...
+
+  🔍 Searching for high-signal sources...
+    Trying security_page: https://zoom.us/security
+      ✓ Found security_page
+    Trying terms_of_service: https://zoom.us/terms
+      ✓ Found terms_of_service
+    Trying privacy_policy: https://zoom.us/privacy
+      ✓ Found privacy_policy
+    Trying psirt_page: https://zoom.us/psirt
+    ✗ Error fetching https://zoom.us/psirt: 404 Client Error: Not Found for url: https://zoom.us/psirt
+    Trying psirt_page: https://zoom.us/security/advisories
+    ✗ Error fetching https://zoom.us/security/advisories: 404 Client Error: Not Found for url: https://zoom.us/security/advisories
+    Checking CISA KEV catalog...
+      ✓ No CISA KEV entries (good sign)
+  ✓ Cached to d21bb537725d603e.json
+
+============================================================
+✓ Resolution complete
+============================================================
+
+
+📊 Adding taxonomy classification...
+
+============================================================
+🏷️  Classifying Software Taxonomy
+============================================================
+  🤖 Analyzing Zoom with Gemini...
+
+  ✓ Classification complete:
+    Primary: Communication & Collaboration → Video Conferencing
+    Confidence: 100.0%
+    Evidence Basis: vendor-stated
+    Deployment: SaaS
+    Data Access: medium
+
+🎯 Generating alternatives recommendations...
+
+============================================================
+🔄 Finding Safer Alternatives
+============================================================
+  🤖 Searching for alternatives with better security posture...
+
+  ✓ Found 1 alternative(s)
+    Confidence: 80.0%
+    1. Microsoft Teams by Microsoft Corporation
+       Confidence: 90.0%
+
+  ✓ Complete assessment cached
+
+============================================================
+🔎 Resolving: Microsoft Teams
+============================================================
+
+📋 Step 1: Identifying product and vendor...
+  Product: Microsoft Teams
+  Vendor: Microsoft
+  Confidence: 100.0%
+
+📡 Step 2: Fetching high-signal sources...
+
+  🔍 Searching for high-signal sources...
+    Trying security_page: https://www.microsoft.com/security
+      ✓ Found security_page
+    Trying terms_of_service: https://www.microsoft.com/terms
+    ✗ Error fetching https://www.microsoft.com/terms: 404 Client Error: Not Found for url: https://www.microsoft.com/terms
+    Trying terms_of_service: https://www.microsoft.com/tos
+    ✗ Error fetching https://www.microsoft.com/tos: 404 Client Error: Not Found for url: https://www.microsoft.com/tos
+    Trying terms_of_service: https://www.microsoft.com/legal/terms
+    ✗ Error fetching https://www.microsoft.com/legal/terms: 404 Client Error: Not Found for url: https://www.microsoft.com/en-us/legal/terms
+    Trying privacy_policy: https://www.microsoft.com/privacy
+      ✓ Found privacy_policy
+    Trying psirt_page: https://www.microsoft.com/psirt
+    ✗ Error fetching https://www.microsoft.com/psirt: 404 Client Error: Not Found for url: https://www.microsoft.com/psirt
+    Trying psirt_page: https://www.microsoft.com/security/advisories
+    ✗ Error fetching https://www.microsoft.com/security/advisories: 404 Client Error: Not Found for url: https://www.microsoft.com/fi-fi/security/advisories
+    Checking CISA KEV catalog...
+      ⚠ Found 349 CISA KEV entries
+  ✓ Cached to 0a7411a215b0fa5b.json
+
+============================================================
+✓ Resolution complete
+============================================================
+
+
+📊 Adding taxonomy classification...
+
+============================================================
+🏷️  Classifying Software Taxonomy
+============================================================
+  🤖 Analyzing Microsoft Teams with Gemini...
+
+  ✓ Classification complete:
+    Primary: Communication & Collaboration → Team Chat/Messaging
+    Confidence: 90.0%
+    Evidence Basis: mixed
+    Deployment: SaaS
+    Data Access: high
+    Secondary: 2 additional categories
+
+🎯 Generating alternatives recommendations...
+
+============================================================
+🔄 Finding Safer Alternatives
+============================================================
+  🤖 Searching for alternatives with better security posture...
+
+  ✓ Found 2 alternative(s)
+    Confidence: 60.0%
+    1. Mattermost by Mattermost, Inc.
+       Confidence: 70.0%
+    2. Signal by Signal Foundation
+       Confidence: 60.0%
+
+  ✓ Complete assessment cached
+✓ Comparison complete
+127.0.0.1 - - [15/Nov/2025 16:01:52] "POST /api/compare HTTP/1.1" 200 -
+127.0.0.1 - - [15/Nov/2025 16:25:56] "OPTIONS /api/assess HTTP/1.1" 200 -
+
+📋 API Request: Assess 'github' (refresh=False)
+
+============================================================
+🔎 Resolving: github
+============================================================
+
+📋 Step 1: Identifying product and vendor...
+  Product: GitHub
+  Vendor: GitHub, Inc.
+  Confidence: 100.0%
+
+📡 Step 2: Fetching high-signal sources...
+
+  🔍 Searching for high-signal sources...
+    Trying security_page: https://github.com/security
+      ✓ Found security_page
+    Trying terms_of_service: https://github.com/terms
+      ✓ Found terms_of_service
+    Trying privacy_policy: https://github.com/privacy
+      ✓ Found privacy_policy
+    Trying psirt_page: https://github.com/psirt
+      ✓ Found psirt_page
+    Checking CISA KEV catalog...
+      ⚠ Found 2 CISA KEV entries
+  ✓ Cached to c0b0109d9439de57.json
+
+============================================================
+✓ Resolution complete
+============================================================
+
+
+📊 Adding taxonomy classification...
+
+============================================================
+🏷️  Classifying Software Taxonomy
+============================================================
+  🤖 Analyzing GitHub with Gemini...
+
+  ✓ Classification complete:
+    Primary: Development & DevOps → Code Repository
+    Confidence: 90.0%
+    Evidence Basis: mixed
+    Deployment: SaaS
+    Data Access: high
+    Secondary: 1 additional categories
+
+🎯 Generating alternatives recommendations...
+
+============================================================
+🔄 Finding Safer Alternatives
+============================================================
+  🤖 Searching for alternatives with better security posture...
+
+  ✓ Found 2 alternative(s)
+    Confidence: 80.0%
+    1. GitLab by GitLab Inc.
+       Confidence: 85.0%
+    2. Bitbucket by Atlassian
+       Confidence: 75.0%
+
+  ✓ Complete assessment cached
+✓ Assessment complete for 'github'
+127.0.0.1 - - [15/Nov/2025 16:26:10] "POST /api/assess HTTP/1.1" 200 -
+127.0.0.1 - - [15/Nov/2025 16:28:17] "OPTIONS /api/assess HTTP/1.1" 200 -
+
+📋 API Request: Assess 'slack' (refresh=False)
+
+============================================================
+🔎 Resolving: slack
+============================================================
+  ✓ Using cached data (0 days old)
+
+📊 Adding taxonomy classification...
+
+============================================================
+🏷️  Classifying Software Taxonomy
+============================================================
+  🤖 Analyzing Slack with Gemini...
+
+  ✓ Classification complete:
+    Primary: Communication & Collaboration → Team Chat/Messaging
+    Confidence: 100.0%
+    Evidence Basis: vendor-stated
+    Deployment: SaaS
+    Data Access: high
+
+🎯 Generating alternatives recommendations...
+
+============================================================
+🔄 Finding Safer Alternatives
+============================================================
+  🤖 Searching for alternatives with better security posture...
+
+  ✓ Found 2 alternative(s)
+    Confidence: 70.0%
+    1. Microsoft Teams by Microsoft
+       Confidence: 80.0%
+    2. Mattermost by Mattermost, Inc.
+       Confidence: 70.0%
+
+  ✓ Complete assessment cached
+✓ Assessment complete for 'slack'
+127.0.0.1 - - [15/Nov/2025 16:28:26] "POST /api/assess HTTP/1.1" 200 -
+127.0.0.1 - - [15/Nov/2025 16:45:30] "OPTIONS /api/assess HTTP/1.1" 200 -
+
+📋 API Request: Assess '"Slack", "Zoom", "https://github.com"' (refresh=False)
+
+============================================================
+🔎 Resolving: "Slack", "Zoom", "https://github.com"
+============================================================
+
+📋 Step 1: Identifying product and vendor...
+✗ Assessment error: 'list' object has no attribute 'get'
+Traceback (most recent call last):
+  File "/home/tibyan/security-assessor/Python-Modules-Backend/web_backend.py", line 105, in assess
+    result = pipeline.assess_with_alternatives(target, force_refresh)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tibyan/security-assessor/Python-Modules-Backend/alternative_suggester.py", line 443, in assess_with_alternatives
+    assessment = self.resolver.resolve_and_classify(user_input, force_refresh)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tibyan/security-assessor/Python-Modules-Backend/taxonomy_classifier.py", line 402, in resolve_and_classify
+    entity_result = self.resolver.resolve(user_input, force_refresh)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tibyan/security-assessor/Python-Modules-Backend/entity_resolver.py", line 291, in resolve
+    confidence = entity.get('confidence', 0)
+                 ^^^^^^^^^^
+AttributeError: 'list' object has no attribute 'get'
+127.0.0.1 - - [15/Nov/2025 16:45:32] "POST /api/assess HTTP/1.1" 500 -
+127.0.0.1 - - [15/Nov/2025 16:46:09] "OPTIONS /api/assess HTTP/1.1" 200 -
+
+📋 API Request: Assess 'slack' (refresh=False)
+
+============================================================
+🔎 Resolving: slack
+============================================================
+  ✓ Using cached data (0 days old)
+
+📊 Adding taxonomy classification...
+
+============================================================
+🏷️  Classifying Software Taxonomy
+============================================================
+  🤖 Analyzing Slack with Gemini...
+
+  ✓ Classification complete:
+    Primary: Communication & Collaboration → Team Chat/Messaging
+    Confidence: 90.0%
+    Evidence Basis: vendor-stated
+    Deployment: SaaS
+    Data Access: high
+
+🎯 Generating alternatives recommendations...
+
+============================================================
+🔄 Finding Safer Alternatives
+============================================================
+  🤖 Searching for alternatives with better security posture...
+
+  ✓ Found 2 alternative(s)
+    Confidence: 70.0%
+    1. Microsoft Teams by Microsoft Corporation
+       Confidence: 80.0%
+    2. Mattermost by Mattermost, Inc.
+       Confidence: 70.0%
+
+  ✓ Complete assessment cached
+✓ Assessment complete for 'slack'
 ```
 
 ## Technology Stack
