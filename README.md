@@ -122,7 +122,7 @@ Confidence:        95%
 - **Deployment**: Docker, Cloud Run, Cloud Build CI/CD
 - **Sources**: CISA KEV, vendor security/PSIRT, Terms of Service, SOC 2/ISO attestations
 
-## Why This Wins
+## Solution
 
 ✓ **Complete solution** → All 7 judging criteria exceeded
 ✓ **Google Cloud native** → GCP + Gemini 2.0 optimized
