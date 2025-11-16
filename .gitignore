@@ -12,7 +12,6 @@ env/
 # Environment variable files
 .env
 *.env
-Configuration/.env
 
 # Pip
 pip-wheel-metadata/
@@ -31,3 +30,7 @@ Thumbs.db
 
 # ---- Other ----
 logs/
+Procfile
+.gcloudignore
+.dockerignore
+*.yaml

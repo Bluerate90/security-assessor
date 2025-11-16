@@ -461,7 +461,8 @@ class CompleteAssessmentPipeline:
         """Save complete assessment to cache"""
         cache_key = data.get('cache_key')
         if cache_key:
-            cache_file = self.resolver.resolver.cache_dir / f"{cache_key}.json"
+            # cache_file = self.resolver.resolver.cache_dir / f"{cache_key}.json"
+            self.resolver.resolver.cache.set(cache_key, data)
             data['cached_at'] = datetime.now().isoformat()
             
             try:

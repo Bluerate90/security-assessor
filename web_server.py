@@ -23,6 +23,7 @@ try:
     from entity_resolver import EntityResolver
     from taxonomy_classifier import EnhancedEntityResolver, TaxonomyClassifier
     from alternative_suggester import AlternativesSuggester, CompleteAssessmentPipeline
+    from gcs_cache import CacheManager
     print("✓ All modules imported successfully")
 except ImportError as e:
     print(f"❌ Error importing modules: {e}")
@@ -49,7 +50,15 @@ STATIC_DIR = HTML_FILE_PATH.parent
 print("\n🔧 Initializing Security Assessor Pipeline...")
 
 try:
-    entity_resolver = EntityResolver(cache_dir=config.CACHE_DIR)
+    # Initialize cache manager first
+    cache_manager = CacheManager(
+        bucket_name=config.CACHE_BUCKET_NAME,
+        use_gcs=config.USE_GCS_CACHE,
+        local_cache_dir=config.CACHE_DIR
+    )
+
+    # Initialize entity resolver with cache manager
+    entity_resolver = EntityResolver(cache_manager=cache_manager)
     enhanced_resolver = EnhancedEntityResolver(entity_resolver)
     pipeline = CompleteAssessmentPipeline(enhanced_resolver)
     suggester = AlternativesSuggester()
@@ -149,20 +158,15 @@ def compare():
 def list_cache():
     """List all cached assessments"""
     try:
-        cache_dir = config.CACHE_DIR
+        # Use cache manager to list cache
+        keys = cache_manager.list_keys()
         items = []
         
-        if not cache_dir.exists():
-            return jsonify({'items': [], 'count': 0})
-        
-        cache_files = sorted(cache_dir.glob('*.json'), 
-                           key=lambda f: f.stat().st_mtime, 
-                           reverse=True)
-        
-        for cache_file in cache_files:
+        for cache_key in keys:
             try:
-                with open(cache_file, 'r') as f:
-                    data = json.load(f)
+                data = cache_manager.get(cache_key)
+                if not data:
+                    continue
                 
                 cached_at = data.get('cached_at')
                 age_str = 'unknown'
@@ -179,7 +183,7 @@ def list_cache():
                         pass
                 
                 items.append({
-                    'cache_key': cache_file.stem,
+                    'cache_key': cache_key,
                     'product_name': data.get('resolution', {}).get('product_name', 'Unknown'),
                     'vendor_name': data.get('resolution', {}).get('vendor_name', 'Unknown'),
                     'category': data.get('classification', {}).get('primary_subcategory', 'Unknown'),
@@ -188,8 +192,11 @@ def list_cache():
                     'evidence_quality': data.get('evidence_quality', {}).get('quality', 'unknown')
                 })
             except Exception as e:
-                print(f"⚠️  Error reading {cache_file.name}: {e}")
+                print(f"⚠️  Error reading cache {cache_key}: {e}")
                 continue
+        
+        # Sort by most recent first
+        items.sort(key=lambda x: x.get('cached_at', ''), reverse=True)
         
         return jsonify({'items': items, 'count': len(items)})
         
@@ -202,13 +209,10 @@ def list_cache():
 def get_cache_item(cache_key):
     """Get specific cached assessment"""
     try:
-        cache_file = config.CACHE_DIR / f"{cache_key}.json"
+        data = cache_manager.get(cache_key)
         
-        if not cache_file.exists():
+        if not data:
             return jsonify({'error': 'Cache item not found'}), 404
-        
-        with open(cache_file, 'r') as f:
-            data = json.load(f)
         
         return jsonify(data)
         
@@ -221,20 +225,7 @@ def get_cache_item(cache_key):
 def clear_cache():
     """Clear all cached assessments"""
     try:
-        cache_dir = config.CACHE_DIR
-        
-        if not cache_dir.exists():
-            return jsonify({'deleted': 0, 'message': 'Cache directory does not exist'})
-        
-        cache_files = list(cache_dir.glob('*.json'))
-        deleted_count = 0
-        
-        for cache_file in cache_files:
-            try:
-                cache_file.unlink()
-                deleted_count += 1
-            except Exception as e:
-                print(f"⚠️  Error deleting {cache_file.name}: {e}")
+        deleted_count = cache_manager.clear_all()
         
         return jsonify({
             'deleted': deleted_count,
@@ -250,22 +241,24 @@ def clear_cache():
 def health_check():
     """Health check endpoint"""
     try:
-        cache_dir = config.CACHE_DIR
-        cache_exists = cache_dir.exists()
-        cache_count = len(list(cache_dir.glob('*.json'))) if cache_exists else 0
+        # Get cache info from cache manager
+        cache_info = cache_manager.get_storage_info()
+        cache_count = len(cache_manager.list_keys())
         
         return jsonify({
             'status': 'healthy',
             'environment': config.FLASK_ENV,
             'api_key_configured': bool(config.GEMINI_API_KEY),
             'cache': {
-                'exists': cache_exists,
+                'type': cache_info['storage_type'],
+                'location': cache_info['location'],
                 'item_count': cache_count
             },
             'modules': {
                 'entity_resolver': 'loaded',
                 'taxonomy_classifier': 'loaded',
-                'alternative_suggester': 'loaded'
+                'alternative_suggester': 'loaded',
+                'gcs_cache': 'loaded'
             },
             'timestamp': datetime.now().isoformat()
         })
@@ -276,11 +269,14 @@ def health_check():
 @app.route('/api/config', methods=['GET'])
 def get_config():
     """Get current configuration (non-sensitive)"""
+    cache_info = cache_manager.get_storage_info()
+    
     return jsonify({
         'environment': config.FLASK_ENV,
         'debug': config.DEBUG,
         'port': config.PORT,
-        'cache_dir': str(config.CACHE_DIR),
+        'cache_type': cache_info['storage_type'],
+        'cache_location': cache_info['location'],
         'cache_ttl_days': config.CACHE_TTL_DAYS,
         'gemini_model': config.GEMINI_MODEL,
         'log_level': config.LOG_LEVEL
@@ -384,13 +380,16 @@ if __name__ == '__main__':
     port = config.PORT
     debug = config.DEBUG
     
+    cache_info = cache_manager.get_storage_info()
+    
     print(f"\n{'='*70}")
     print(f"🚀 Starting Web Server")
     print(f"{'='*70}")
     print(f"📍 Open: http://localhost:{port}")
     print(f"🔧 Debug Mode: {debug}")
     print(f"📦 Environment: {config.FLASK_ENV}")
-    print(f"📂 Cache Dir: {config.CACHE_DIR}")
+    print(f"💾 Cache Type: {cache_info['storage_type']}")
+    print(f"📂 Cache Location: {cache_info['location']}")
     print(f"📄 HTML File: {HTML_FILE_PATH}")
     
     print(f"\nAPI Endpoints:")

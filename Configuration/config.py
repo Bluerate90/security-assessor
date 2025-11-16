@@ -1,6 +1,7 @@
 """
 Configuration Management for Security Assessor
 Loads environment variables from .env file
+Now includes Google Cloud Storage support
 """
 
 import os
@@ -10,18 +11,18 @@ from pathlib import Path
 try:
     from dotenv import load_dotenv
 except ImportError:
-    print("❌ python-dotenv not installed. Run: pip install python-dotenv")
-    sys.exit(1)
+    print("⚠️ python-dotenv not installed - continuing without it")
+    def load_dotenv(path=None):
+        pass
 
 # Load .env file from Configuration directory
 ENV_FILE = Path(__file__).parent / '.env'
 if ENV_FILE.exists():
-    load_dotenv(ENV_FILE)
-    print(f"✓ Loaded environment from {ENV_FILE}")
-else:
-    print(f"⚠ .env file not found at {ENV_FILE}")
-    print(f"  Create it by copying Configuration/.env.example")
-
+    try:
+        load_dotenv(ENV_FILE)
+        print(f"✓ Loaded environment from {ENV_FILE}")
+    except:
+        pass
 
 class Config:
     """Configuration - reads from .env via dotenv"""
@@ -36,9 +37,13 @@ class Config:
     PORT = int(os.getenv('PORT', 5000))
     SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
     
-    # Cache Configuration
+    # Cache Configuration - LOCAL
     CACHE_DIR = Path(os.getenv('CACHE_DIR', './Runtime/assessor_cache'))
     CACHE_TTL_DAYS = int(os.getenv('CACHE_TTL_DAYS', 7))
+    
+    # Cache Configuration - GOOGLE CLOUD STORAGE
+    USE_GCS_CACHE = os.getenv('USE_GCS_CACHE', 'false').lower() == 'true'
+    CACHE_BUCKET_NAME = os.getenv('CACHE_BUCKET_NAME', 'security-assessor-cache')
     
     # Logging Configuration
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
@@ -59,8 +64,8 @@ class Config:
         if not cls.GEMINI_API_KEY:
             errors.append("GEMINI_API_KEY is required. Set it in Configuration/.env file")
         
-        if not cls.CACHE_DIR:
-            errors.append("CACHE_DIR is required")
+        if cls.USE_GCS_CACHE and not cls.CACHE_BUCKET_NAME:
+            errors.append("CACHE_BUCKET_NAME is required when USE_GCS_CACHE=true")
         
         return errors
     
@@ -73,7 +78,15 @@ class Config:
         print(f"Environment:       {cls.FLASK_ENV}")
         print(f"Debug Mode:        {cls.DEBUG}")
         print(f"Port:              {cls.PORT}")
-        print(f"Cache Directory:   {cls.CACHE_DIR}")
+        
+        # Cache configuration
+        if cls.USE_GCS_CACHE:
+            print(f"Cache Type:        Google Cloud Storage")
+            print(f"Cache Bucket:      gs://{cls.CACHE_BUCKET_NAME}/")
+        else:
+            print(f"Cache Type:        Local Filesystem")
+            print(f"Cache Directory:   {cls.CACHE_DIR}")
+        
         print(f"Cache TTL:         {cls.CACHE_TTL_DAYS} days")
         print(f"Log Level:         {cls.LOG_LEVEL}")
         print(f"Gemini Model:      {cls.GEMINI_MODEL}")

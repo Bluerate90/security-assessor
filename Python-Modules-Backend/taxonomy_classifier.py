@@ -1,6 +1,6 @@
 """
 Software Taxonomy Classifier
-Uses configuration from config.py which loads .env file
+Uses CacheManager through entity_resolver
 """
 
 import json
@@ -234,7 +234,7 @@ CRITICAL: If evidence is insufficient or contradictory, set confidence < 0.5 and
         
         valid_basis = ['vendor-stated', 'mixed', 'independent', 'insufficient']
         if classification['evidence_basis'] not in valid_basis:
-            print(f"  ⚠ Invalid evidence_basis, defaulting to 'insufficient'")
+            print(f"  ⚠️ Invalid evidence_basis, defaulting to 'insufficient'")
             classification['evidence_basis'] = 'insufficient'
     
     def _fallback_classification(self, entity_data: Dict, error_msg: str) -> Dict:
@@ -376,7 +376,7 @@ class EnhancedEntityResolver:
     def __init__(self, entity_resolver, taxonomy_classifier=None):
         """
         Args:
-            entity_resolver: EntityResolver instance
+            entity_resolver: EntityResolver instance (with CacheManager)
             taxonomy_classifier: TaxonomyClassifier instance (optional)
         """
         self.resolver = entity_resolver
@@ -399,32 +399,32 @@ class EnhancedEntityResolver:
         Returns:
             Complete entity data with classification
         """
+        # Get resolution (uses CacheManager internally)
         entity_result = self.resolver.resolve(user_input, force_refresh)
         
         print(f"\n📊 Adding taxonomy classification...")
         
+        # Add classification
         classification = self.classifier.classify(
             entity_result['resolution'],
             entity_result['sources']
         )
         
         entity_result['classification'] = classification
-        
         entity_result['evidence_quality']['classification_confidence'] = classification['confidence']
         
+        # Save enhanced result (uses CacheManager)
         self._save_enhanced_cache(entity_result)
         
         return entity_result
     
     def _save_enhanced_cache(self, data: Dict):
-        """Save enhanced data to cache"""
+        """Save enhanced data using CacheManager"""
         cache_key = data.get('cache_key')
         if cache_key:
-            cache_file = self.resolver.cache_dir / f"{cache_key}.json"
-            data['cached_at'] = datetime.now().isoformat()
-            
-            try:
-                with open(cache_file, 'w') as f:
-                    json.dump(data, f, indent=2)
-            except Exception as e:
-                print(f"  ⚠ Enhanced cache save error: {e}")
+            # Use the resolver's cache manager
+            success = self.resolver.cache.set(cache_key, data)
+            if success:
+                print(f"  ✓ Enhanced assessment cached")
+            else:
+                print(f"  ⚠️ Enhanced cache save failed")

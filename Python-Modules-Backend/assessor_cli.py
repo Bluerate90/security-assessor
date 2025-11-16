@@ -47,7 +47,7 @@ class AssessorCLI:
         # Initialize pipeline
         try:
             print("🔧 Initializing Security Assessor...")
-            entity_resolver = EntityResolver(cache_dir=self.cache_dir)
+            entity_resolver = EntityResolver()
             enhanced_resolver = EnhancedEntityResolver(entity_resolver)
             self.pipeline = CompleteAssessmentPipeline(enhanced_resolver)
             self.suggester = AlternativesSuggester()

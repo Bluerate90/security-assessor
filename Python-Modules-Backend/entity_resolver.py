@@ -1,6 +1,6 @@
 """
 Entity Resolution Module for Security Assessor
-Uses configuration from config.py which loads .env file
+Now uses CacheManager for GCS or local storage
 """
 
 import json
@@ -18,28 +18,41 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / 'Configuration'))
 from config import config
 
+# Import cache manager
+sys.path.insert(0, str(Path(__file__).parent))
+from gcs_cache import CacheManager
+
 
 class EntityResolver:
     """Resolves and enriches entity information with persistent caching"""
     
-    def __init__(self, cache_dir: Path = None):
+    def __init__(self, cache_manager: CacheManager = None):
         """
         Initialize the resolver with cache and API configuration
         
         Args:
-            cache_dir: Directory for persistent cache storage (uses config if None)
+            cache_manager: CacheManager instance (creates default if None)
         """
-        self.cache_dir = cache_dir or config.CACHE_DIR
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        # Initialize cache manager
+        if cache_manager:
+            self.cache = cache_manager
+        else:
+            self.cache = CacheManager(
+                bucket_name=config.CACHE_BUCKET_NAME,
+                use_gcs=config.USE_GCS_CACHE,
+                local_cache_dir=config.CACHE_DIR
+            )
         
-        # Initialize Gemini with config API key
+        # Initialize Gemini
         if not config.GEMINI_API_KEY:
             raise ValueError("Gemini API key required. Set GEMINI_API_KEY in Configuration/.env")
         
         genai.configure(api_key=config.GEMINI_API_KEY)
         self.model = genai.GenerativeModel(config.GEMINI_MODEL)
         
-        print(f"✓ Entity Resolver initialized with cache at {self.cache_dir}")
+        storage_info = self.cache.get_storage_info()
+        print(f"✓ Entity Resolver initialized with {storage_info['storage_type']} cache")
+        print(f"  Location: {storage_info['location']}")
     
     def _get_cache_key(self, input_text: str) -> str:
         """Generate consistent cache key from input"""
@@ -47,40 +60,35 @@ class EntityResolver:
     
     def _load_from_cache(self, cache_key: str) -> Optional[Dict]:
         """Load cached entity data if it exists and is recent"""
-        cache_file = self.cache_dir / f"{cache_key}.json"
+        data = self.cache.get(cache_key)
         
-        if not cache_file.exists():
+        if not data:
             return None
         
         try:
-            with open(cache_file, 'r') as f:
-                data = json.load(f)
-            
             cached_time = datetime.fromisoformat(data.get('cached_at', '2000-01-01'))
             age_days = (datetime.now() - cached_time).days
             
             if age_days > config.CACHE_TTL_DAYS:
-                print(f"  ⚠ Cache stale ({age_days} days old), will refresh")
+                print(f"  ⚠️ Cache stale ({age_days} days old), will refresh")
                 return None
             
             print(f"  ✓ Using cached data ({age_days} days old)")
             return data
             
         except Exception as e:
-            print(f"  ⚠ Cache read error: {e}")
+            print(f"  ⚠️ Cache validation error: {e}")
             return None
     
     def _save_to_cache(self, cache_key: str, data: Dict):
-        """Save entity data to persistent cache"""
-        cache_file = self.cache_dir / f"{cache_key}.json"
-        data['cached_at'] = datetime.now().isoformat()
+        """Save entity data to cache"""
+        success = self.cache.set(cache_key, data)
         
-        try:
-            with open(cache_file, 'w') as f:
-                json.dump(data, f, indent=2)
-            print(f"  ✓ Cached to {cache_file.name}")
-        except Exception as e:
-            print(f"  ⚠ Cache write error: {e}")
+        if success:
+            storage_type = self.cache.get_storage_info()['storage_type']
+            print(f"  ✓ Cached to {storage_type} storage: {cache_key}")
+        else:
+            print(f"  ⚠️ Cache save failed")
     
     def _extract_domain_from_input(self, user_input: str) -> Optional[str]:
         """Extract domain from URL or return None"""
@@ -254,7 +262,7 @@ If you cannot identify it confidently, set confidence < 0.5 and explain why.
                     })
             
             if matches:
-                print(f"      ⚠ Found {len(matches)} CISA KEV entries")
+                print(f"      ⚠️ Found {len(matches)} CISA KEV entries")
                 return {
                     'found': True,
                     'url': kev_url,
@@ -301,7 +309,7 @@ If you cannot identify it confidently, set confidence < 0.5 and explain why.
                 entity.get('vendor_name', '')
             )
         else:
-            print(f"\n⚠ Low confidence resolution - skipping source fetch")
+            print(f"\n⚠️ Low confidence resolution - skipping source fetch")
             sources = {}
         
         result = {

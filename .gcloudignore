@@ -8,8 +8,10 @@ __pycache__/
 env/
 venv/
 .env
+.env.local
 *.log
 .DS_Store
 README.md
-Documentation/README.md
 Runtime/assessor_cache/
+.pytest_cache/
+.coverage

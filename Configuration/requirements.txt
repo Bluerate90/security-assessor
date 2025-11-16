@@ -1,19 +1,11 @@
-# Core Web Framework
-flask>=3.0.0
-flask-cors>=4.0.0
-
-# AI and Generative APIs
-google-generativeai>=0.3.0
-
-# HTTP and Web Utilities
-requests>=2.31.0
-beautifulsoup4>=4.12.0
-
-# Environment Configuration
-python-dotenv>=1.0.0
-
-# Web Server
+Flask==3.0.0
+Flask-CORS==4.0.0
+google-generativeai==0.3.0
+requests==2.31.0
+beautifulsoup4==4.12.2
+python-dotenv==1.0.0
 Werkzeug==3.0.0
+gunicorn==21.2.0
 
-# Optional: Production Server
-gunicorn>=21.0.0
+# Google Cloud Storage for cache
+google-cloud-storage>=2.10.0
