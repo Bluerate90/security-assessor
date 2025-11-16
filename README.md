@@ -77,19 +77,19 @@ We chose **gemini-2.0-flash-exp** after rigorous testing because it delivers:
 
 ## Judging Criteria Alignment
 
-✅ **Entity Resolution & Categorization ** → Gemini 2.0 resolves ambiguous inputs with 90%+ confidence. Complete 7-category taxonomy.
+✅ **Entity Resolution & Categorization** → Gemini 2.0 resolves ambiguous inputs with 90%+ confidence. Complete 7-category taxonomy.
 
-✅ **Evidence & Citation Quality ** → Every finding cites sources. Independent vs. vendor-stated labels. CISA KEV integration.
+✅ **Evidence & Citation Quality** → Every finding cites sources. Independent vs. vendor-stated labels. CISA KEV integration.
 
-✅ **Problem Fit & Clarity ** → Direct CISO use case with proven 1080× ROI. Three production-ready interfaces.
+✅ **Problem Fit & Clarity** → Direct CISO use case with proven 1080× ROI. Three production-ready interfaces.
 
-✅ **Technical Execution & Resilience ** → Full Google Cloud deployment. GCS cache with fallback. Docker + Cloud Run ready.
+✅ **Technical Execution & Resilience** → Full Google Cloud deployment. GCS cache with fallback. Docker + Cloud Run ready.
 
-✅ **Security Posture Synthesis (12%)** → Complete briefs with entity, taxonomy, evidence quality, CISA KEV status, deployment model, and alternatives.
+✅ **Security Posture Synthesis** → Complete briefs with entity, taxonomy, evidence quality, CISA KEV status, deployment model, and alternatives.
 
-✅ **Trust/Risk Score Transparency (8%)** → Confidence scores for all stages. Clear rationale and evidence basis.
+✅ **Trust/Risk Score Transparency** → Confidence scores for all stages. Clear rationale and evidence basis.
 
-✅ **Alternatives & Quick Compare (6%)** → 1-2 safer alternatives with security advantages and trade-offs.
+✅ **Alternatives & Quick Compare** → 1-2 safer alternatives with security advantages and trade-offs.
 
 ## Live Demo
 ```bash
@@ -133,7 +133,7 @@ Confidence:        95%
 
 ## Get Started
 ```bash
-git clone https://github.com/YOUR-USERNAME/security-assessor
+git clone https://github.com/Bluerate90/security-assessor
 cd security-assessor
 nano Configuration/.env  # Add Gemini API key
 pip install -r Configuration/requirements.txt
