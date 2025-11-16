@@ -77,13 +77,13 @@ We chose **gemini-2.0-flash-exp** after rigorous testing because it delivers:
 
 ## Judging Criteria Alignment
 
-✅ **Entity Resolution & Categorization (20%)** → Gemini 2.0 resolves ambiguous inputs with 90%+ confidence. Complete 7-category taxonomy.
+✅ **Entity Resolution & Categorization ** → Gemini 2.0 resolves ambiguous inputs with 90%+ confidence. Complete 7-category taxonomy.
 
-✅ **Evidence & Citation Quality (24%)** → Every finding cites sources. Independent vs. vendor-stated labels. CISA KEV integration.
+✅ **Evidence & Citation Quality ** → Every finding cites sources. Independent vs. vendor-stated labels. CISA KEV integration.
 
-✅ **Problem Fit & Clarity (15%)** → Direct CISO use case with proven 1080× ROI. Three production-ready interfaces.
+✅ **Problem Fit & Clarity ** → Direct CISO use case with proven 1080× ROI. Three production-ready interfaces.
 
-✅ **Technical Execution & Resilience (15%)** → Full Google Cloud deployment. GCS cache with fallback. Docker + Cloud Run ready.
+✅ **Technical Execution & Resilience ** → Full Google Cloud deployment. GCS cache with fallback. Docker + Cloud Run ready.
 
 ✅ **Security Posture Synthesis (12%)** → Complete briefs with entity, taxonomy, evidence quality, CISA KEV status, deployment model, and alternatives.
 
